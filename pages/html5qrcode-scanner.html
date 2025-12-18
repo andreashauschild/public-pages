@@ -716,7 +716,7 @@
                 // Use full scan area for better detection of high-density codes
                 // qrbox is removed to allow the library to scan the entire video feed
                 return {
-                    fps: 10,
+                    fps: 5, // Reduced from 10 to mitigate main thread blocking at 1080p
                     // qrbox: { width: qrBoxSize, height: qrBoxSize }, // Removed to scan full frame
                     aspectRatio: window.innerWidth / window.innerHeight,
                     videoConstraints: videoConstraints,
