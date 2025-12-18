@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Code Generator</title>
+    <meta name="description" content="Create code-free, customizable QR codes instantly.">
+
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent: #8b5cf6;
+            --accent-hover: #7c3aed;
+            --border: #334155;
+            --card-radius: 16px;
+            --btn-radius: 12px;
+            --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            outline: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-family);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            padding: 1rem 2rem;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin: 0;
+        }
+
+        main {
+            flex: 1;
+            padding: 2rem;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--card-radius);
+            padding: 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .controls-section {
+            flex: 1;
+            min-width: 300px;
+        }
+
+        .preview-section {
+            flex: 0 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        label {
+            display: block;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        input[type="text"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: var(--btn-radius);
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus,
+        textarea:focus,
+        select:focus {
+            border-color: var(--accent);
+        }
+
+        .color-picker-group {
+            display: flex;
+            gap: 1rem;
+        }
+
+        input[type="color"] {
+            -webkit-appearance: none;
+            border: none;
+            width: 100%;
+            height: 48px;
+            border-radius: var(--btn-radius);
+            cursor: pointer;
+            background: transparent;
+        }
+
+        input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+
+        input[type="color"]::-webkit-color-swatch {
+            border: 1px solid var(--border);
+            border-radius: var(--btn-radius);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.75rem 1.5rem;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: var(--btn-radius);
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.2s;
+            text-decoration: none;
+            gap: 0.5rem;
+        }
+
+        .btn:hover {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            margin-top: 1rem;
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--text-secondary);
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        #canvas-container {
+            background: white;
+            padding: 1rem;
+            border-radius: var(--card-radius);
+            margin-bottom: 1.5rem;
+            box-shadow: 0 0 0 1px var(--border);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 1rem;
+        }
+
+        #qr-placeholder img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        .nav-btn {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .nav-btn:hover {
+            color: var(--text-primary);
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <a href="../index.html" class="nav-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+            Home
+        </a>
+        <h1>QR Generator</h1>
+    </header>
+
+    <main>
+        <!-- Controls -->
+        <div class="card controls-section">
+            <div class="form-group">
+                <label for="qr-content">Content</label>
+                <textarea id="qr-content" rows="4"
+                    placeholder="Enter text, URL, or data...">https://example.com</textarea>
+            </div>
+
+            <div class="color-picker-group form-group">
+                <div style="flex: 1;">
+                    <label for="color-fg">Foreground</label>
+                    <input type="color" id="color-fg" value="#000000">
+                </div>
+                <div style="flex: 1;">
+                    <label for="color-bg">Background</label>
+                    <input type="color" id="color-bg" value="#ffffff">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="opt-ecc">Error Correction</label>
+                <select id="opt-ecc">
+                    <option value="L" selected>Low (7%)</option>
+                    <option value="M">Medium (15%)</option>
+                    <option value="Q">Quartile (25%)</option>
+                    <option value="H">High (30%)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="opt-size">Size (px)</label>
+                <select id="opt-size">
+                    <option value="100">100 x 100</option>
+                    <option value="200" selected>200 x 200</option>
+                    <option value="400">400 x 400</option>
+                    <option value="600">600 x 600</option>
+                    <option value="800">800 x 800</option>
+                    <option value="1000">1000 x 1000</option>
+                </select>
+            </div>
+
+            <button class="btn" id="btn-generate">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                    <path d="M12 6v12" />
+                    <path d="M6 12h12" />
+                </svg>
+                Regenerate
+            </button>
+        </div>
+
+        <!-- Preview -->
+        <div class="card preview-section">
+            <div id="canvas-container">
+                <div id="qr-placeholder"></div>
+            </div>
+
+            <button class="btn" id="btn-download">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                Download PNG
+            </button>
+        </div>
+    </main>
+
+    <script src="../lib/qrcode.min.js"></script>
+    <script>
+        const $ = (s) => document.querySelector(s);
+        const container = $('#qr-placeholder');
+        let qrCodeObj = null;
+
+        function generateQR() {
+            if (typeof QRCode === 'undefined') {
+                console.error('QRCode library not loaded yet');
+                setTimeout(generateQR, 100);
+                return;
+            }
+
+            const text = $('#qr-content').value || ' ';
+            const fg = $('#color-fg').value;
+            const bg = $('#color-bg').value;
+            const eccVal = $('#opt-ecc').value;
+            const sizeVal = parseInt($('#opt-size').value, 10);
+
+            // Map ECC values to library constants
+            // QRCode.CorrectLevel : L=1, M=0, Q=3, H=2
+            let correctLevel = QRCode.CorrectLevel.M;
+            if (eccVal === 'L') correctLevel = QRCode.CorrectLevel.L;
+            if (eccVal === 'Q') correctLevel = QRCode.CorrectLevel.Q;
+            if (eccVal === 'H') correctLevel = QRCode.CorrectLevel.H;
+
+            // Clear previous
+            container.innerHTML = '';
+
+            try {
+                // qrcodejs creates the image inside the container
+                qrCodeObj = new QRCode(container, {
+                    text: text,
+                    width: sizeVal,
+                    height: sizeVal,
+                    colorDark: fg,
+                    colorLight: bg,
+                    correctLevel: correctLevel
+                });
+            } catch (err) {
+                // Auto-downgrade to Low ECC if capacity is exceeded and we aren't already at Low
+                if ((err.message.includes('undefined') || err.message.includes('Too long')) && correctLevel !== QRCode.CorrectLevel.L) {
+                    console.warn('Capacity exceeded, retrying with Low ECC...');
+                    try {
+                        // Update UI to reflect the change (optional, but good for transparency)
+                        // $('#opt-ecc').value = 'L'; 
+
+                        qrCodeObj = new QRCode(container, {
+                            text: text,
+                            width: sizeVal,
+                            height: sizeVal,
+                            colorDark: fg,
+                            colorLight: bg,
+                            correctLevel: QRCode.CorrectLevel.L
+                        });
+                        return; // Success on retry
+                    } catch (retryErr) {
+                        // Retry failed too, fall through to error display
+                        err = retryErr;
+                    }
+                }
+
+                console.error(err);
+
+                let msg = err.message;
+                if (msg.includes('undefined') || msg.includes('Too long')) {
+                    msg = "Data too long! Even with Low error correction, this text exceeds the maximum QR capacity (approx 2900 bytes).";
+                }
+
+                container.innerHTML = `<div style="color: #ef4444; padding: 1rem; text-align: center;">
+                    <strong>Generation Failed</strong><br>
+                    <div style="font-size: 0.9em; margin-top: 0.5rem; color: #cbd5e1">${msg}</div>
+                </div>`;
+            }
+        }
+
+        // Event Listeners
+        $('#btn-generate').addEventListener('click', generateQR);
+
+        ['input', 'change'].forEach(evt => {
+            $('#qr-content').addEventListener(evt, generateQR);
+            $('#color-fg').addEventListener(evt, generateQR);
+            $('#color-bg').addEventListener(evt, generateQR);
+            $('#opt-ecc').addEventListener(evt, generateQR);
+            $('#opt-size').addEventListener(evt, generateQR);
+        });
+
+        $('#btn-download').addEventListener('click', () => {
+            // Find the image created by qrcodejs
+            const img = container.querySelector('img');
+            if (img && img.src) {
+                const link = document.createElement('a');
+                link.download = `qrcode-${Date.now()}.png`;
+                link.href = img.src;
+                link.click();
+            } else {
+                // Fallback if it rendered a canvas (unlikely with this lib default but possible)
+                const canvas = container.querySelector('canvas');
+                if (canvas) {
+                    const link = document.createElement('a');
+                    link.download = `qrcode-${Date.now()}.png`;
+                    link.href = canvas.toDataURL();
+                    link.click();
+                }
+            }
+        });
+
+        // Init
+        setTimeout(generateQR, 100); // Give a brief moment for script to parse
+    </script>
+</body>
+
+</html>
