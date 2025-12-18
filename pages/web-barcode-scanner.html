@@ -1,0 +1,1511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Web Barcode Scanner</title>
+    <meta name="description" content="Full-featured barcode and QR code scanner with camera control">
+    <meta name="theme-color" content="#0f172a">
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-card: #16213e;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent: #00ff88;
+            --accent-dim: rgba(0, 255, 136, 0.3);
+            --accent-glow: rgba(0, 255, 136, 0.5);
+            --error: #ef4444;
+            --warning: #f59e0b;
+            --border: #334155;
+            --radius-sm: 6px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+            --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-mono: 'SF Mono', Monaco, Consolas, monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 640px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+
+        header {
+            text-align: center;
+            padding: 1rem 0;
+        }
+
+        header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* Video Section */
+        .video-section {
+            margin-bottom: 1rem;
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            background: #000;
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            aspect-ratio: 4/3;
+        }
+
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .scan-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 75%;
+            max-width: 280px;
+            aspect-ratio: 1;
+            border: 2px solid rgba(0, 255, 136, 0.6);
+            border-radius: var(--radius-lg);
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4);
+            pointer-events: none;
+        }
+
+        .scan-overlay::before,
+        .scan-overlay::after {
+            content: '';
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border-color: var(--accent);
+            border-style: solid;
+        }
+
+        .scan-overlay::before {
+            top: -2px;
+            left: -2px;
+            border-width: 4px 0 0 4px;
+            border-radius: 8px 0 0 0;
+        }
+
+        .scan-overlay::after {
+            bottom: -2px;
+            right: -2px;
+            border-width: 0 4px 4px 0;
+            border-radius: 0 0 8px 0;
+        }
+
+        .flash-overlay {
+            position: absolute;
+            inset: 0;
+            background: var(--accent);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.1s ease;
+        }
+
+        .flash-overlay.active {
+            opacity: 0.3;
+        }
+
+        /* Camera Info Panel */
+        .camera-info-panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 0.75rem 1rem;
+            margin-bottom: 1rem;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.25rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            color: var(--text-secondary);
+        }
+
+        .info-value {
+            color: var(--accent);
+            font-weight: 500;
+        }
+
+        /* Status Display */
+        .status-display {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+            background: var(--bg-secondary);
+            border-radius: var(--radius-md);
+            font-size: 0.9rem;
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--text-muted);
+        }
+
+        .status-display.ready .status-indicator {
+            background: var(--text-muted);
+        }
+
+        .status-display.scanning .status-indicator {
+            background: var(--accent);
+            box-shadow: 0 0 8px var(--accent-glow);
+            animation: pulse 1.5s infinite;
+        }
+
+        .status-display.error .status-indicator {
+            background: var(--error);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Settings Panel */
+        .settings-panel {
+            margin-bottom: 1rem;
+        }
+
+        .settings-toggle {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.2s;
+        }
+
+        .settings-toggle:hover {
+            background: var(--bg-card);
+        }
+
+        .toggle-icon {
+            font-size: 1.2rem;
+            font-weight: bold;
+            transition: transform 0.2s;
+        }
+
+        .settings-panel.open .toggle-icon {
+            transform: rotate(45deg);
+        }
+
+        .settings-content {
+            display: none;
+            padding: 1rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-top: none;
+            border-radius: 0 0 var(--radius-md) var(--radius-md);
+        }
+
+        .settings-panel.open .settings-content {
+            display: block;
+        }
+
+        .settings-panel.open .settings-toggle {
+            border-radius: var(--radius-md) var(--radius-md) 0 0;
+        }
+
+        .setting-group {
+            margin-bottom: 1rem;
+        }
+
+        .setting-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .setting-group label {
+            display: block;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin-bottom: 0.35rem;
+        }
+
+        .setting-group select,
+        .setting-group input[type="number"] {
+            width: 100%;
+            padding: 0.6rem 0.75rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-size: 0.95rem;
+        }
+
+        .setting-group select:focus,
+        .setting-group input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .setting-group-inline {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .setting-group-inline label {
+            margin-bottom: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+        }
+
+        .setting-group-inline input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--accent);
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: #000;
+        }
+
+        .btn-danger {
+            background: var(--error);
+            color: #fff;
+        }
+
+        .btn-secondary {
+            background: var(--border);
+            color: var(--text-primary);
+        }
+
+        .btn-small {
+            flex: none;
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+        }
+
+        /* Results Section */
+        .results-section {
+            margin-bottom: 1rem;
+        }
+
+        .results-section h2 {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        .latest-result {
+            background: var(--bg-card);
+            border: 2px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 1rem;
+            min-height: 60px;
+            word-break: break-all;
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .latest-result.success {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .result-placeholder {
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .result-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .history-list {
+            max-height: 200px;
+            overflow-y: auto;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+        }
+
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 0.75rem;
+            border-bottom: 1px solid var(--border);
+            gap: 0.5rem;
+        }
+
+        .history-item:last-child {
+            border-bottom: none;
+        }
+
+        .history-content {
+            flex: 1;
+            word-break: break-all;
+            font-size: 0.85rem;
+        }
+
+        .history-meta {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.25rem;
+        }
+
+        .history-format {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .history-time {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+
+        .history-copy {
+            background: none;
+            border: none;
+            color: var(--accent);
+            cursor: pointer;
+            padding: 0.25rem;
+            font-size: 0.8rem;
+        }
+
+        .history-empty {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 1.5rem;
+            font-style: italic;
+        }
+
+        /* Limitations Section */
+        .limitations-section {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .limitations-section h2 {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+            font-weight: 500;
+        }
+
+        .limitations-section ul {
+            list-style: none;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .limitations-section li {
+            padding: 0.35rem 0;
+            padding-left: 1rem;
+            position: relative;
+        }
+
+        .limitations-section li::before {
+            content: '\2022';
+            color: var(--warning);
+            position: absolute;
+            left: 0;
+        }
+
+        .limitations-section strong {
+            color: var(--text-primary);
+        }
+
+        /* Error Display */
+        .error-display {
+            background: var(--error);
+            color: #fff;
+            padding: 1rem;
+            border-radius: var(--radius-md);
+            margin-bottom: 1rem;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            padding: 1rem 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Web Barcode Scanner</h1>
+        </header>
+
+        <!-- Video Section -->
+        <section class="video-section">
+            <div class="video-container">
+                <video id="video" playsinline autoplay muted></video>
+                <div class="scan-overlay"></div>
+                <div class="flash-overlay" id="flashOverlay"></div>
+            </div>
+        </section>
+
+        <!-- Camera Info Panel -->
+        <section class="camera-info-panel">
+            <div class="info-row">
+                <span class="info-label">Camera:</span>
+                <span class="info-value" id="infoCamera">--</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Requested:</span>
+                <span class="info-value" id="infoRequested">--</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Actual:</span>
+                <span class="info-value" id="infoActual">--</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Frame Rate:</span>
+                <span class="info-value" id="infoFrameRate">--</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Max Supported:</span>
+                <span class="info-value" id="infoMaxRes">--</span>
+            </div>
+        </section>
+
+        <!-- Status Display -->
+        <div class="status-display ready" id="statusDisplay">
+            <span class="status-indicator"></span>
+            <span class="status-text" id="statusText">Ready to scan</span>
+        </div>
+
+        <!-- Settings Panel -->
+        <section class="settings-panel" id="settingsPanel">
+            <button class="settings-toggle" id="settingsToggle">
+                <span>Settings</span>
+                <span class="toggle-icon">+</span>
+            </button>
+            <div class="settings-content" id="settingsContent">
+                <div class="setting-group">
+                    <label for="cameraSelect">Camera</label>
+                    <select id="cameraSelect">
+                        <option value="">Loading cameras...</option>
+                    </select>
+                </div>
+
+                <div class="setting-group">
+                    <label for="resolutionSelect">Resolution</label>
+                    <select id="resolutionSelect">
+                        <option value="auto">Auto / Default</option>
+                        <option value="640x480">640 x 480 (VGA)</option>
+                        <option value="1280x720" selected>1280 x 720 (HD)</option>
+                        <option value="1920x1080">1920 x 1080 (Full HD)</option>
+                        <option value="2560x1440">2560 x 1440 (QHD)</option>
+                        <option value="3840x2160">3840 x 2160 (4K)</option>
+                        <option value="max">Maximum Available</option>
+                    </select>
+                </div>
+
+                <div class="setting-group">
+                    <label for="scanModeSelect">Scan Mode</label>
+                    <select id="scanModeSelect">
+                        <option value="qr" selected>QR Code Only (Faster)</option>
+                        <option value="multi">Multi-Format (All Barcodes)</option>
+                    </select>
+                </div>
+
+                <div class="setting-group">
+                    <label for="cooldownInput">Duplicate Cooldown (ms)</label>
+                    <input type="number" id="cooldownInput" value="2000" min="500" max="10000" step="500">
+                </div>
+
+                <div class="setting-group">
+                    <label for="decodeIntervalInput">Decode Interval (ms)</label>
+                    <input type="number" id="decodeIntervalInput" value="100" min="50" max="500" step="50">
+                </div>
+
+                <div class="setting-group setting-group-inline" id="torchGroup" style="display: none;">
+                    <label>
+                        <input type="checkbox" id="torchToggle">
+                        Flashlight / Torch
+                    </label>
+                </div>
+            </div>
+        </section>
+
+        <!-- Controls -->
+        <section class="controls">
+            <button class="btn btn-primary" id="startBtn">Start Scanner</button>
+            <button class="btn btn-danger" id="stopBtn" disabled>Stop</button>
+            <button class="btn btn-secondary" id="clearBtn">Clear</button>
+        </section>
+
+        <!-- Results Section -->
+        <section class="results-section">
+            <h2>Latest Result</h2>
+            <div class="latest-result" id="latestResult">
+                <span class="result-placeholder">No barcode scanned yet</span>
+            </div>
+            <div class="result-actions" id="resultActions" style="display: none;">
+                <button class="btn btn-secondary btn-small" id="copyLatestBtn">Copy</button>
+            </div>
+
+            <h2>Scan History</h2>
+            <div class="history-list" id="historyList">
+                <div class="history-empty">No scans yet</div>
+            </div>
+        </section>
+
+        <!-- Known Limitations -->
+        <section class="limitations-section">
+            <h2>Known Limitations</h2>
+            <ul>
+                <li><strong>HTTPS Required:</strong> Camera access requires HTTPS (or localhost for development)</li>
+                <li><strong>iOS Safari:</strong> May return lower resolution than requested; uses "ideal" constraints only</li>
+                <li><strong>Resolution Variance:</strong> Actual resolution may differ from requested based on device capabilities</li>
+                <li><strong>Torch Support:</strong> Flashlight toggle only available on some Android devices</li>
+                <li><strong>Multi-Format Mode:</strong> Less reliable than QR-only mode; use QR-only for best results</li>
+            </ul>
+        </section>
+
+        <!-- Error Display -->
+        <div class="error-display" id="errorDisplay" style="display: none;"></div>
+
+        <footer>
+            Web Barcode Scanner v1.0
+        </footer>
+    </div>
+
+    <script type="module">
+        import {
+            BrowserMultiFormatReader,
+            BrowserQRCodeReader,
+            DecodeHintType
+        } from 'https://esm.sh/@zxing/library@0.21.3';
+
+        // ============================================================
+        // Platform Detection
+        // ============================================================
+        class PlatformDetector {
+            static isIOS() {
+                return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            }
+
+            static isAndroid() {
+                return /Android/i.test(navigator.userAgent);
+            }
+
+            static isMobile() {
+                return this.isIOS() || this.isAndroid();
+            }
+        }
+
+        // ============================================================
+        // Settings Manager (localStorage)
+        // ============================================================
+        class SettingsManager {
+            constructor() {
+                this.prefix = 'webScanner_';
+                this.defaults = {
+                    selectedCamera: '',
+                    resolution: '1280x720',
+                    scanMode: 'qr',
+                    cooldown: 2000,
+                    decodeInterval: 100,
+                    history: []
+                };
+            }
+
+            get(key) {
+                const stored = localStorage.getItem(this.prefix + key);
+                if (stored === null) {
+                    return this.defaults[key];
+                }
+                // Parse numbers and arrays
+                if (key === 'cooldown' || key === 'decodeInterval') {
+                    return parseInt(stored, 10);
+                }
+                if (key === 'history') {
+                    try {
+                        return JSON.parse(stored);
+                    } catch {
+                        return [];
+                    }
+                }
+                return stored;
+            }
+
+            set(key, value) {
+                if (key === 'history') {
+                    localStorage.setItem(this.prefix + key, JSON.stringify(value));
+                } else {
+                    localStorage.setItem(this.prefix + key, String(value));
+                }
+            }
+        }
+
+        // ============================================================
+        // Feedback Manager (audio, visual, haptic)
+        // ============================================================
+        class FeedbackManager {
+            constructor(flashElement) {
+                this.flashElement = flashElement;
+            }
+
+            playBeep() {
+                try {
+                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.type = 'sine';
+                    osc.frequency.value = 1800;
+                    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+                    osc.start(ctx.currentTime);
+                    osc.stop(ctx.currentTime + 0.1);
+                } catch (e) {
+                    // Audio not supported
+                }
+            }
+
+            triggerVibration(duration = 100) {
+                if (navigator.vibrate) {
+                    navigator.vibrate(duration);
+                }
+            }
+
+            showFlash() {
+                if (this.flashElement) {
+                    this.flashElement.classList.add('active');
+                    setTimeout(() => {
+                        this.flashElement.classList.remove('active');
+                    }, 150);
+                }
+            }
+
+            triggerAll() {
+                this.playBeep();
+                this.triggerVibration();
+                this.showFlash();
+            }
+        }
+
+        // ============================================================
+        // History Manager
+        // ============================================================
+        class HistoryManager {
+            constructor(settings) {
+                this.settings = settings;
+                this.history = settings.get('history') || [];
+            }
+
+            isDuplicate(content, cooldownMs) {
+                const now = Date.now();
+                const lastScan = this.history[0];
+                if (lastScan && lastScan.content === content && (now - lastScan.timestamp) < cooldownMs) {
+                    return true;
+                }
+                return false;
+            }
+
+            addScan(content, format) {
+                this.history.unshift({
+                    content,
+                    format,
+                    timestamp: Date.now()
+                });
+                // Limit history
+                if (this.history.length > 100) {
+                    this.history = this.history.slice(0, 100);
+                }
+                this.settings.set('history', this.history);
+            }
+
+            getHistory() {
+                return this.history;
+            }
+
+            clearHistory() {
+                this.history = [];
+                this.settings.set('history', []);
+            }
+        }
+
+        // ============================================================
+        // Camera Manager
+        // ============================================================
+        class CameraManager {
+            constructor(videoElement, settings) {
+                this.videoElement = videoElement;
+                this.settings = settings;
+                this.stream = null;
+                this.cameras = [];
+            }
+
+            async enumerateCameras() {
+                try {
+                    // Request permission first
+                    const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    tempStream.getTracks().forEach(track => track.stop());
+
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    this.cameras = devices.filter(d => d.kind === 'videoinput');
+                    return this.cameras;
+                } catch (e) {
+                    console.error('Error enumerating cameras:', e);
+                    return [];
+                }
+            }
+
+            buildConstraints(cameraId, resolution) {
+                const constraints = { audio: false, video: {} };
+
+                // Camera selection - use ideal on iOS, exact elsewhere
+                if (cameraId) {
+                    if (PlatformDetector.isIOS()) {
+                        constraints.video.deviceId = { ideal: cameraId };
+                    } else {
+                        constraints.video.deviceId = { exact: cameraId };
+                    }
+                } else if (PlatformDetector.isMobile()) {
+                    constraints.video.facingMode = { ideal: 'environment' };
+                }
+
+                // Resolution handling - iOS only uses ideal
+                if (resolution === 'auto') {
+                    // Let browser decide
+                } else if (resolution === 'max') {
+                    constraints.video.width = { ideal: 4096 };
+                    constraints.video.height = { ideal: 2160 };
+                } else {
+                    const [width, height] = resolution.split('x').map(Number);
+                    constraints.video.width = { ideal: width };
+                    constraints.video.height = { ideal: height };
+                }
+
+                return constraints;
+            }
+
+            async startCamera(constraints) {
+                try {
+                    this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    this.videoElement.srcObject = this.stream;
+                    await this.videoElement.play();
+                    return this.stream;
+                } catch (error) {
+                    throw this.handleCameraError(error);
+                }
+            }
+
+            handleCameraError(error) {
+                if (error.name === 'NotAllowedError') {
+                    return new Error('Camera permission denied. Please allow camera access in your browser settings.');
+                } else if (error.name === 'NotFoundError') {
+                    return new Error('No camera found. Please connect a camera and try again.');
+                } else if (error.name === 'NotReadableError') {
+                    return new Error('Camera is being used by another application.');
+                } else if (error.name === 'OverconstrainedError') {
+                    return new Error('OVERCONSTRAINED'); // Special marker for fallback
+                } else if (error.name === 'SecurityError') {
+                    return new Error('Camera access requires HTTPS. Please use a secure connection.');
+                }
+                return new Error(`Camera error: ${error.message || error}`);
+            }
+
+            stopCamera() {
+                if (this.stream) {
+                    this.stream.getTracks().forEach(track => track.stop());
+                    this.stream = null;
+                }
+                this.videoElement.srcObject = null;
+            }
+
+            getActualResolution() {
+                if (!this.stream) return null;
+                const track = this.stream.getVideoTracks()[0];
+                const settings = track.getSettings();
+                return {
+                    width: settings.width,
+                    height: settings.height,
+                    frameRate: settings.frameRate
+                };
+            }
+
+            getMaxResolution() {
+                if (!this.stream) return null;
+                const track = this.stream.getVideoTracks()[0];
+                const capabilities = track.getCapabilities?.();
+                if (capabilities?.width?.max && capabilities?.height?.max) {
+                    return {
+                        width: capabilities.width.max,
+                        height: capabilities.height.max
+                    };
+                }
+                return null;
+            }
+
+            hasTorchSupport() {
+                if (!this.stream) return false;
+                const track = this.stream.getVideoTracks()[0];
+                const capabilities = track.getCapabilities?.();
+                return !!capabilities?.torch;
+            }
+
+            async toggleTorch(enabled) {
+                if (!this.stream) return false;
+                const track = this.stream.getVideoTracks()[0];
+                try {
+                    await track.applyConstraints({
+                        advanced: [{ torch: enabled }]
+                    });
+                    return true;
+                } catch (e) {
+                    console.error('Torch toggle failed:', e);
+                    return false;
+                }
+            }
+
+            getCameraLabel(deviceId) {
+                const camera = this.cameras.find(c => c.deviceId === deviceId);
+                return camera?.label || 'Unknown Camera';
+            }
+        }
+
+        // ============================================================
+        // Scanner Manager
+        // ============================================================
+        class ScannerManager {
+            constructor(videoElement, onResult) {
+                this.videoElement = videoElement;
+                this.onResult = onResult;
+                this.codeReader = null;
+                this.controls = null;
+                this.scanning = false;
+            }
+
+            async start(scanMode, decodeInterval, constraints) {
+                // Create appropriate reader
+                const hints = new Map();
+                hints.set(DecodeHintType.TRY_HARDER, true);
+
+                if (scanMode === 'qr') {
+                    this.codeReader = new BrowserQRCodeReader(hints);
+                } else {
+                    this.codeReader = new BrowserMultiFormatReader(hints);
+                }
+
+                this.codeReader.timeBetweenDecodingAttempts = decodeInterval;
+
+                // Start decoding
+                this.controls = await this.codeReader.decodeFromConstraints(
+                    constraints,
+                    this.videoElement,
+                    (result, error) => {
+                        if (result) {
+                            const format = result.getBarcodeFormat?.() || (scanMode === 'qr' ? 'QR_CODE' : 'UNKNOWN');
+                            this.onResult({
+                                content: result.getText(),
+                                format: String(format)
+                            });
+                        }
+                        // Suppress normal scan errors
+                        if (error && !this.isNormalScanError(error)) {
+                            console.warn('Scan error:', error);
+                        }
+                    }
+                );
+
+                this.scanning = true;
+            }
+
+            isNormalScanError(error) {
+                const errorStr = String(error);
+                return (
+                    errorStr.includes('NotFoundException') ||
+                    errorStr.includes('No MultiFormat Readers') ||
+                    errorStr.includes('selectBestPatterns') ||
+                    errorStr.includes('FinderPatternFinder') ||
+                    error.name === 'NotFoundException' ||
+                    error.name === 'N' ||
+                    error.name === 't'
+                );
+            }
+
+            stop() {
+                if (this.controls) {
+                    try {
+                        this.controls.stop();
+                    } catch (e) {
+                        // Ignore
+                    }
+                    this.controls = null;
+                }
+                if (this.codeReader) {
+                    try {
+                        this.codeReader.reset();
+                    } catch (e) {
+                        // Ignore
+                    }
+                    this.codeReader = null;
+                }
+                this.scanning = false;
+            }
+
+            isScanning() {
+                return this.scanning;
+            }
+        }
+
+        // ============================================================
+        // UI Controller
+        // ============================================================
+        class UIController {
+            constructor(elements) {
+                this.elements = elements;
+            }
+
+            updateStatus(message, type = 'ready') {
+                const { statusDisplay, statusText } = this.elements;
+                statusDisplay.className = `status-display ${type}`;
+                statusText.textContent = message;
+            }
+
+            updateCameraInfo(info) {
+                const { infoCamera, infoRequested, infoActual, infoFrameRate, infoMaxRes } = this.elements;
+                infoCamera.textContent = info.camera || '--';
+                infoRequested.textContent = info.requested || '--';
+                infoActual.textContent = info.actual || '--';
+                infoFrameRate.textContent = info.frameRate || '--';
+                infoMaxRes.textContent = info.maxRes || '--';
+            }
+
+            showLatestResult(content, format) {
+                const { latestResult, resultActions } = this.elements;
+                latestResult.innerHTML = '';
+                latestResult.textContent = content;
+                latestResult.classList.add('success');
+                resultActions.style.display = 'flex';
+            }
+
+            clearLatestResult() {
+                const { latestResult, resultActions } = this.elements;
+                latestResult.innerHTML = '<span class="result-placeholder">No barcode scanned yet</span>';
+                latestResult.classList.remove('success');
+                resultActions.style.display = 'none';
+            }
+
+            renderHistory(history) {
+                const { historyList } = this.elements;
+                if (history.length === 0) {
+                    historyList.innerHTML = '<div class="history-empty">No scans yet</div>';
+                    return;
+                }
+
+                historyList.innerHTML = history.map(item => {
+                    const time = new Date(item.timestamp).toLocaleTimeString();
+                    const escapedContent = this.escapeHtml(item.content);
+                    return `
+                        <div class="history-item">
+                            <div class="history-content">${escapedContent}</div>
+                            <div class="history-meta">
+                                <span class="history-format">${item.format}</span>
+                                <span class="history-time">${time}</span>
+                                <button class="history-copy" data-content="${escapedContent}">Copy</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                // Add copy handlers
+                historyList.querySelectorAll('.history-copy').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        this.copyToClipboard(btn.dataset.content);
+                    });
+                });
+            }
+
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            async copyToClipboard(text) {
+                try {
+                    if (navigator.clipboard) {
+                        await navigator.clipboard.writeText(text);
+                    } else {
+                        const ta = document.createElement('textarea');
+                        ta.value = text;
+                        document.body.appendChild(ta);
+                        ta.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(ta);
+                    }
+                    this.showToast('Copied to clipboard');
+                } catch (e) {
+                    console.error('Copy failed:', e);
+                }
+            }
+
+            showToast(message) {
+                // Simple toast implementation
+                const existing = document.querySelector('.toast-notification');
+                if (existing) existing.remove();
+
+                const toast = document.createElement('div');
+                toast.className = 'toast-notification';
+                toast.textContent = message;
+                toast.style.cssText = `
+                    position: fixed;
+                    bottom: 20px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background: var(--bg-secondary);
+                    color: var(--text-primary);
+                    padding: 0.75rem 1.5rem;
+                    border-radius: 50px;
+                    border: 1px solid var(--border);
+                    z-index: 9999;
+                    font-size: 0.9rem;
+                `;
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 2000);
+            }
+
+            showError(message) {
+                const { errorDisplay } = this.elements;
+                errorDisplay.textContent = message;
+                errorDisplay.style.display = 'block';
+            }
+
+            hideError() {
+                const { errorDisplay } = this.elements;
+                errorDisplay.style.display = 'none';
+            }
+
+            setButtonStates(isScanning) {
+                const { startBtn, stopBtn } = this.elements;
+                startBtn.disabled = isScanning;
+                stopBtn.disabled = !isScanning;
+            }
+
+            populateCameraSelect(cameras, selectedId) {
+                const { cameraSelect } = this.elements;
+                cameraSelect.innerHTML = '';
+
+                if (cameras.length === 0) {
+                    cameraSelect.innerHTML = '<option value="">No cameras found</option>';
+                    return;
+                }
+
+                cameras.forEach((camera, index) => {
+                    const option = document.createElement('option');
+                    option.value = camera.deviceId;
+                    option.text = camera.label || `Camera ${index + 1}`;
+                    if (camera.deviceId === selectedId) {
+                        option.selected = true;
+                    }
+                    cameraSelect.appendChild(option);
+                });
+            }
+
+            showTorchOption(show) {
+                const { torchGroup } = this.elements;
+                torchGroup.style.display = show ? 'block' : 'none';
+            }
+        }
+
+        // ============================================================
+        // Main Application
+        // ============================================================
+        class App {
+            constructor() {
+                this.elements = {
+                    video: document.getElementById('video'),
+                    flashOverlay: document.getElementById('flashOverlay'),
+                    statusDisplay: document.getElementById('statusDisplay'),
+                    statusText: document.getElementById('statusText'),
+                    infoCamera: document.getElementById('infoCamera'),
+                    infoRequested: document.getElementById('infoRequested'),
+                    infoActual: document.getElementById('infoActual'),
+                    infoFrameRate: document.getElementById('infoFrameRate'),
+                    infoMaxRes: document.getElementById('infoMaxRes'),
+                    settingsPanel: document.getElementById('settingsPanel'),
+                    settingsToggle: document.getElementById('settingsToggle'),
+                    cameraSelect: document.getElementById('cameraSelect'),
+                    resolutionSelect: document.getElementById('resolutionSelect'),
+                    scanModeSelect: document.getElementById('scanModeSelect'),
+                    cooldownInput: document.getElementById('cooldownInput'),
+                    decodeIntervalInput: document.getElementById('decodeIntervalInput'),
+                    torchGroup: document.getElementById('torchGroup'),
+                    torchToggle: document.getElementById('torchToggle'),
+                    startBtn: document.getElementById('startBtn'),
+                    stopBtn: document.getElementById('stopBtn'),
+                    clearBtn: document.getElementById('clearBtn'),
+                    latestResult: document.getElementById('latestResult'),
+                    resultActions: document.getElementById('resultActions'),
+                    copyLatestBtn: document.getElementById('copyLatestBtn'),
+                    historyList: document.getElementById('historyList'),
+                    errorDisplay: document.getElementById('errorDisplay')
+                };
+
+                this.settings = new SettingsManager();
+                this.feedback = new FeedbackManager(this.elements.flashOverlay);
+                this.history = new HistoryManager(this.settings);
+                this.camera = new CameraManager(this.elements.video, this.settings);
+                this.scanner = new ScannerManager(this.elements.video, (result) => this.onScanResult(result));
+                this.ui = new UIController(this.elements);
+
+                this.wasScanning = false;
+                this.latestContent = '';
+            }
+
+            async initialize() {
+                // Load saved settings
+                this.loadSettings();
+
+                // Enumerate cameras
+                const cameras = await this.camera.enumerateCameras();
+                const savedCamera = this.settings.get('selectedCamera');
+                this.ui.populateCameraSelect(cameras, savedCamera);
+
+                // If no saved camera, try to select back camera
+                if (!savedCamera && cameras.length > 0) {
+                    const backCamera = cameras.find(c =>
+                        c.label.toLowerCase().includes('back') ||
+                        c.label.toLowerCase().includes('environment')
+                    );
+                    if (backCamera) {
+                        this.elements.cameraSelect.value = backCamera.deviceId;
+                    }
+                }
+
+                // Render history
+                this.ui.renderHistory(this.history.getHistory());
+
+                // Setup event listeners
+                this.setupEventListeners();
+
+                // Handle visibility changes
+                this.setupVisibilityHandling();
+            }
+
+            loadSettings() {
+                const { resolutionSelect, scanModeSelect, cooldownInput, decodeIntervalInput } = this.elements;
+                resolutionSelect.value = this.settings.get('resolution');
+                scanModeSelect.value = this.settings.get('scanMode');
+                cooldownInput.value = this.settings.get('cooldown');
+                decodeIntervalInput.value = this.settings.get('decodeInterval');
+            }
+
+            setupEventListeners() {
+                const {
+                    settingsToggle, settingsPanel, startBtn, stopBtn, clearBtn,
+                    cameraSelect, resolutionSelect, scanModeSelect,
+                    cooldownInput, decodeIntervalInput, torchToggle, copyLatestBtn
+                } = this.elements;
+
+                // Settings toggle
+                settingsToggle.addEventListener('click', () => {
+                    settingsPanel.classList.toggle('open');
+                });
+
+                // Start/Stop buttons
+                startBtn.addEventListener('click', () => this.startScanning());
+                stopBtn.addEventListener('click', () => this.stopScanning());
+
+                // Clear history
+                clearBtn.addEventListener('click', () => {
+                    this.history.clearHistory();
+                    this.ui.renderHistory([]);
+                    this.ui.clearLatestResult();
+                    this.latestContent = '';
+                });
+
+                // Settings changes
+                cameraSelect.addEventListener('change', (e) => {
+                    this.settings.set('selectedCamera', e.target.value);
+                    if (this.scanner.isScanning()) {
+                        this.restartScanning();
+                    }
+                });
+
+                resolutionSelect.addEventListener('change', (e) => {
+                    this.settings.set('resolution', e.target.value);
+                    if (this.scanner.isScanning()) {
+                        this.restartScanning();
+                    }
+                });
+
+                scanModeSelect.addEventListener('change', (e) => {
+                    this.settings.set('scanMode', e.target.value);
+                    if (this.scanner.isScanning()) {
+                        this.restartScanning();
+                    }
+                });
+
+                cooldownInput.addEventListener('change', (e) => {
+                    this.settings.set('cooldown', parseInt(e.target.value, 10));
+                });
+
+                decodeIntervalInput.addEventListener('change', (e) => {
+                    this.settings.set('decodeInterval', parseInt(e.target.value, 10));
+                    if (this.scanner.isScanning()) {
+                        this.restartScanning();
+                    }
+                });
+
+                // Torch toggle
+                torchToggle.addEventListener('change', (e) => {
+                    this.camera.toggleTorch(e.target.checked);
+                });
+
+                // Copy latest result
+                copyLatestBtn.addEventListener('click', () => {
+                    if (this.latestContent) {
+                        this.ui.copyToClipboard(this.latestContent);
+                    }
+                });
+            }
+
+            setupVisibilityHandling() {
+                document.addEventListener('visibilitychange', () => {
+                    if (document.hidden) {
+                        if (this.scanner.isScanning()) {
+                            this.wasScanning = true;
+                            this.stopScanning();
+                        }
+                    } else {
+                        if (this.wasScanning) {
+                            this.wasScanning = false;
+                            this.startScanning();
+                        }
+                    }
+                });
+
+                // Cleanup on page unload
+                window.addEventListener('beforeunload', () => {
+                    this.stopScanning();
+                });
+            }
+
+            async startScanning() {
+                this.ui.hideError();
+                this.ui.updateStatus('Starting camera...', 'ready');
+
+                const cameraId = this.elements.cameraSelect.value;
+                const resolution = this.elements.resolutionSelect.value;
+                const scanMode = this.elements.scanModeSelect.value;
+                const decodeInterval = this.settings.get('decodeInterval');
+
+                // Build constraints
+                let constraints = this.camera.buildConstraints(cameraId, resolution);
+
+                try {
+                    await this.scanner.start(scanMode, decodeInterval, constraints);
+
+                    // Update UI
+                    this.ui.setButtonStates(true);
+                    this.ui.updateStatus('Scanning... Point camera at barcode', 'scanning');
+
+                    // Wait for video to be ready, then update info
+                    setTimeout(() => this.updateCameraInfo(resolution), 500);
+
+                } catch (error) {
+                    // Handle OverconstrainedError with fallback
+                    if (error.message === 'OVERCONSTRAINED' || error.name === 'OverconstrainedError') {
+                        console.warn('Overconstrained, trying fallback...');
+                        await this.startWithFallback(scanMode, decodeInterval);
+                    } else {
+                        this.ui.showError(error.message);
+                        this.ui.updateStatus('Error', 'error');
+                        this.ui.setButtonStates(false);
+                    }
+                }
+            }
+
+            async startWithFallback(scanMode, decodeInterval) {
+                const fallbacks = [
+                    () => this.camera.buildConstraints(this.elements.cameraSelect.value, 'auto'),
+                    () => ({ audio: false, video: { facingMode: { ideal: 'environment' } } }),
+                    () => ({ audio: false, video: true })
+                ];
+
+                for (const getFallback of fallbacks) {
+                    try {
+                        const constraints = getFallback();
+                        await this.scanner.start(scanMode, decodeInterval, constraints);
+
+                        this.ui.setButtonStates(true);
+                        this.ui.updateStatus('Scanning (fallback mode)', 'scanning');
+                        setTimeout(() => this.updateCameraInfo('Fallback'), 500);
+                        return;
+                    } catch (e) {
+                        continue;
+                    }
+                }
+
+                this.ui.showError('Could not start camera with any settings');
+                this.ui.updateStatus('Error', 'error');
+            }
+
+            stopScanning() {
+                this.scanner.stop();
+                this.camera.stopCamera();
+                this.ui.setButtonStates(false);
+                this.ui.updateStatus('Scanner stopped', 'ready');
+                this.ui.showTorchOption(false);
+                this.elements.torchToggle.checked = false;
+                this.resetCameraInfo();
+            }
+
+            async restartScanning() {
+                this.scanner.stop();
+                this.camera.stopCamera();
+                await this.startScanning();
+            }
+
+            updateCameraInfo(requestedResolution) {
+                const actual = this.camera.getActualResolution();
+                const maxRes = this.camera.getMaxResolution();
+                const cameraId = this.elements.cameraSelect.value;
+
+                let requestedLabel = requestedResolution;
+                if (requestedResolution === 'auto') {
+                    requestedLabel = 'Auto';
+                } else if (requestedResolution === 'max') {
+                    requestedLabel = 'Maximum';
+                }
+
+                this.ui.updateCameraInfo({
+                    camera: this.camera.getCameraLabel(cameraId),
+                    requested: requestedLabel,
+                    actual: actual ? `${actual.width} x ${actual.height}` : '--',
+                    frameRate: actual?.frameRate ? `${Math.round(actual.frameRate)} fps` : '--',
+                    maxRes: maxRes ? `${maxRes.width} x ${maxRes.height}` : 'N/A'
+                });
+
+                // Check torch support
+                if (this.camera.hasTorchSupport()) {
+                    this.ui.showTorchOption(true);
+                }
+            }
+
+            resetCameraInfo() {
+                this.ui.updateCameraInfo({
+                    camera: '--',
+                    requested: '--',
+                    actual: '--',
+                    frameRate: '--',
+                    maxRes: '--'
+                });
+            }
+
+            onScanResult(result) {
+                const cooldown = this.settings.get('cooldown');
+
+                // Check for duplicate
+                if (this.history.isDuplicate(result.content, cooldown)) {
+                    return;
+                }
+
+                // Add to history
+                this.history.addScan(result.content, result.format);
+
+                // Trigger feedback
+                this.feedback.triggerAll();
+
+                // Update UI
+                this.latestContent = result.content;
+                this.ui.showLatestResult(result.content, result.format);
+                this.ui.renderHistory(this.history.getHistory());
+            }
+        }
+
+        // ============================================================
+        // Initialize Application
+        // ============================================================
+        const app = new App();
+        app.initialize().catch(err => {
+            console.error('App initialization error:', err);
+        });
+    </script>
+</body>
+</html>
