@@ -575,8 +575,9 @@
     </div>
 
     <!-- Application Logic -->
-    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <script type="module">
+        import { BrowserMultiFormatReader, BrowserQRCodeReader, NotFoundException } from 'https://esm.sh/@zxing/library@0.21.3';
+
         // Constants
         const STORAGE_KEY_CAM = 'barcode_scanner_cam_id';
         const STORAGE_KEY_RES = 'barcode_scanner_resolution';
@@ -630,6 +631,7 @@
                 this.history = JSON.parse(localStorage.getItem(STORAGE_KEY_HIST) || '[]');
                 this.isScanning = false;
                 this.torchOn = false;
+                this.wasScanningBeforeHide = false;
             }
 
             persist() {
@@ -656,132 +658,103 @@
             }
         }
 
-        // --- CORE ---
+        // --- CORE (ZXing Implementation) ---
         class ScannerManager {
             constructor(state, onResult) {
                 this.state = state;
                 this.onResult = onResult;
-                this.html5QrCode = new Html5Qrcode("scanner-container"); // Library attaches here
+                this.codeReader = null;
+                this.controls = null;
+                this.videoElement = document.getElementById('video-feed');
             }
 
-            getConfig() {
+            getConstraints() {
                 // Resolution mapping
-                // html5-qrcode takes { fps, qrbox, videoConstraints }
-                // videoConstraints passes directly to getUserMedia
-
                 const resolutions = {
                     '480p': { width: 640, height: 480 },
                     '720p': { width: 1280, height: 720 },
                     '1080p': { width: 1920, height: 1080 },
                     '4K': { width: 3840, height: 2160 },
                     'max': { width: 4096, height: 2160 },
-                    'auto': { facingMode: "environment" }
+                    'auto': null // let browser decide
                 };
 
-                // Handle Portrait constraint swapping for better mobile result
-                const isPortrait = window.innerHeight > window.innerWidth;
-                let targetRes = resolutions[this.state.selectedResolution] || {};
-
-                // Deep copy to avoid mutating constant
-                targetRes = { ...targetRes };
-
-                // Swap if generic width/height are set
-                if (this.state.selectedResolution !== 'auto' && isPortrait && targetRes.width && !targetRes.width.min && !targetRes.width.ideal) {
-                    // If simple object {width: 1920, height: 1080}
-                    const w = targetRes.width;
-                    targetRes.width = targetRes.height;
-                    targetRes.height = w;
-                }
-
-                const videoConstraints = {
-                    facingMode: this.state.selectedCameraId ? undefined : "environment",
-                    focusMode: "continuous", // Helps on some devices
-                };
-
-                // Apply resolution
-                if (targetRes.width) {
-                    if (typeof targetRes.width === 'object') {
-                        videoConstraints.width = targetRes.width;
-                        videoConstraints.height = targetRes.height;
-                    } else {
-                        videoConstraints.width = { ideal: targetRes.width };
-                        videoConstraints.height = { ideal: targetRes.height };
-                    }
-                }
+                const targetRes = resolutions[this.state.selectedResolution];
+                const videoConstraints = {};
 
                 if (this.state.selectedCameraId) {
                     videoConstraints.deviceId = { exact: this.state.selectedCameraId };
+                } else {
+                    videoConstraints.facingMode = "environment";
                 }
 
-                // Use full scan area for better detection of high-density codes
-                // qrbox is removed to allow the library to scan the entire video feed
+                if (targetRes) {
+                    videoConstraints.width = { ideal: targetRes.width };
+                    videoConstraints.height = { ideal: targetRes.height };
+                }
+
                 return {
-                    fps: 5, // Reduced from 10 to mitigate main thread blocking at 1080p
-                    // qrbox: { width: qrBoxSize, height: qrBoxSize }, // Removed to scan full frame
-                    aspectRatio: window.innerWidth / window.innerHeight,
-                    videoConstraints: videoConstraints,
-                    useBarCodeDetectorIfSupported: true
+                    audio: false,
+                    video: videoConstraints
                 };
             }
 
             async start() {
                 try {
-                    if (this.state.isScanning) {
-                        await this.stop(false); // Don't update UI yet
+                    // Stop any existing session
+                    this.stop(false);
+
+                    // Initialize Reader
+                    if (this.state.scanFormat === 'qr') {
+                        this.codeReader = new BrowserQRCodeReader();
+                        console.log('Initialized QR-only reader');
+                    } else {
+                        // Multi-format (slower but more compatible)
+                        this.codeReader = new BrowserMultiFormatReader();
+                        console.log('Initialized Multi-format reader');
                     }
 
-                    const config = this.getConfig();
-                    console.log('Starting html5-qrcode with:', config);
+                    const constraints = this.getConstraints();
+                    console.log('Starting ZXing with constraints:', constraints);
 
-                    // Hide my custom video element if it exists, library creates its own
-                    if ($('#video-feed')) $('#video-feed').style.display = 'none';
-
-                    // Formats if supported by this lib (mostly it scans most things by default or takes config)
-
-                    await this.html5QrCode.start(
-                        this.state.selectedCameraId || { facingMode: "environment" },
-                        config,
-                        (decodedText, decodedResult) => {
-                            // Handle result
-                            const format = decodedResult?.result?.format?.formatName || 'QR_CODE';
-                            this.onResult({ getText: () => decodedText, getBarcodeFormat: () => format });
-                        },
-                        (errorMessage) => {
-                            // parse error, ignore
+                    // Start Decoding
+                    // decodeFromConstraints handles getUserMedia internally
+                    this.controls = await this.codeReader.decodeFromConstraints(
+                        constraints,
+                        this.videoElement,
+                        (result, error) => {
+                            if (result) {
+                                const format = result.getBarcodeFormat ? result.getBarcodeFormat() : (this.state.scanFormat === 'qr' ? 'QR_CODE' : 'UNKNOWN');
+                                // ZXing returns raw text
+                                this.onResult({
+                                    getText: () => result.getText(),
+                                    getBarcodeFormat: () => String(format)
+                                });
+                            }
+                            // Ignore NotFoundExceptions (scanning empty frame)
                         }
                     );
 
                     this.state.isScanning = true;
                     this.updateUI();
 
-                    // After start, attempt to get capabilities for Torch
-                    setTimeout(() => this.checkCapabilities(), 1000);
+                    // Check capabilities after stream start (for Torch)
+                    setTimeout(() => this.checkCapabilities(), 500);
 
                 } catch (err) {
-                    console.error('Start failed', err);
+                    console.error('ZXing Start failed', err);
                     const statusEl = $('#camera-status');
-                    if (statusEl) statusEl.textContent = 'Error: ' + err;
-
-                    // Fallback (auto res)
-                    if ((err.name === 'OverconstrainedError' || err.toString().includes('OverconstrainedError')) && this.state.selectedResolution !== 'auto') {
-                        console.log('Retry auto...');
-                        this.state.selectedResolution = 'auto';
-                        try { await this.start(); return; } catch (e) { }
-                    }
+                    if (statusEl) statusEl.textContent = 'Error: ' + err.message;
 
                     this.state.isScanning = false;
                     this.updateUI();
-                    const videoFeed = $('#video-feed');
-                    if (videoFeed) videoFeed.style.display = 'block'; // Show my video placeholder again
                 }
             }
 
             checkCapabilities() {
-                // Find the video element created by library
-                const v = document.querySelector('#scanner-container video');
-                if (!v || !v.srcObject) return;
+                if (!this.videoElement || !this.videoElement.srcObject) return;
 
-                const track = v.srcObject.getVideoTracks()[0];
+                const track = this.videoElement.srcObject.getVideoTracks()[0];
                 if (!track) return;
 
                 const settings = track.getSettings();
@@ -789,18 +762,18 @@
                 $('#debug-fps').textContent = settings.frameRate ? Math.round(settings.frameRate) : '-';
 
                 const caps = track.getCapabilities ? track.getCapabilities() : {};
+
+                // Toggle torch button visibility
                 const hasTorch = !!caps.torch;
-                if (hasTorch) {
-                    $('#btn-torch').style.display = 'flex';
-                } else {
-                    $('#btn-torch').style.display = 'none';
+                const torchBtn = $('#btn-torch');
+                if (torchBtn) {
+                    torchBtn.style.display = hasTorch ? 'flex' : 'none';
                 }
             }
 
             async toggleTorch() {
-                const v = document.querySelector('#scanner-container video');
-                if (!v || !v.srcObject) return;
-                const track = v.srcObject.getVideoTracks()[0];
+                if (!this.videoElement || !this.videoElement.srcObject) return;
+                const track = this.videoElement.srcObject.getVideoTracks()[0];
                 if (!track) return;
 
                 try {
@@ -808,20 +781,31 @@
                     await track.applyConstraints({
                         advanced: [{ torch: this.state.torchOn }]
                     });
-                    if (this.state.torchOn) $('#btn-torch').classList.add('active');
-                    else $('#btn-torch').classList.remove('active');
+
+                    const btn = $('#btn-torch');
+                    if (btn) {
+                        if (this.state.torchOn) btn.classList.add('active');
+                        else btn.classList.remove('active');
+                    }
                 } catch (e) {
+                    console.error('Torch error', e);
                     this.state.torchOn = false;
-                    $('#btn-torch').classList.remove('active');
+                    $('#btn-torch')?.classList.remove('active');
                 }
             }
 
-            async stop(updateUI = true) {
-                try {
-                    if (this.state.isScanning) {
-                        await this.html5QrCode.stop();
-                    }
-                } catch (e) { console.log('Stop error', e); }
+            stop(updateUI = true) {
+                if (this.controls) {
+                    try {
+                        this.controls.stop();
+                    } catch (e) { console.error('Error stopping controls', e); }
+                    this.controls = null;
+                }
+
+                // Clear video src (ZXing sometimes leaves it)
+                if (this.videoElement) {
+                    this.videoElement.srcObject = null;
+                }
 
                 this.state.isScanning = false;
                 this.state.torchOn = false;
@@ -835,6 +819,10 @@
                 const toggleBtn = $('#btn-toggle-scan');
                 const guide = $('.overlay-guide');
                 const torchBtn = $('#btn-torch');
+                const videoFeed = $('#video-feed');
+
+                // Ensure video is visible (ZXing attaches to this unlike html5-qrcode which created its own)
+                if (videoFeed) videoFeed.style.opacity = this.state.isScanning ? '1' : '0';
 
                 if (this.state.isScanning) {
                     if (camStatus) camStatus.style.display = 'none';
@@ -844,9 +832,6 @@
                         toggleBtn.classList.add('stop');
                         toggleBtn.setAttribute('aria-label', 'Stop Scanning');
                     }
-
-                    // The library renders a shaded region if qrbox is set, but we have a custom overlay too.
-                    // Let's keep ours for consistency.
                     if (guide) guide.style.opacity = '1';
 
                 } else {
@@ -861,32 +846,42 @@
                         toggleBtn.setAttribute('aria-label', 'Start Scanning');
                     }
                     if (guide) guide.style.opacity = '0.3';
-                    if (torchBtn) torchBtn.style.display = 'none';
+                    if (torchBtn) {
+                        torchBtn.style.display = 'none';
+                        torchBtn.classList.remove('active');
+                    }
                 }
             }
 
             async listCameras() {
                 try {
-                    const devices = await Html5Qrcode.getCameras();
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    const videoDevices = devices.filter(d => d.kind === 'videoinput');
                     const select = $('#camera-select');
                     select.innerHTML = '';
 
-                    if (devices && devices.length) {
-                        devices.forEach((device, index) => {
+                    if (videoDevices && videoDevices.length) {
+                        videoDevices.forEach((device, index) => {
                             const opt = document.createElement('option');
-                            opt.value = device.id;
+                            opt.value = device.deviceId;
                             opt.text = device.label || `Camera ${index + 1}`;
-                            if (this.state.selectedCameraId === device.id) {
+                            if (this.state.selectedCameraId === device.deviceId) {
                                 opt.selected = true;
                             }
                             select.appendChild(opt);
                         });
 
+                        // Default selection if none
                         if (!this.state.selectedCameraId) {
-                            const back = devices.find(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('environment'));
-                            this.state.selectedCameraId = back ? back.id : devices[0].id;
+                            const back = videoDevices.find(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('environment'));
+                            this.state.selectedCameraId = back ? back.deviceId : videoDevices[0].deviceId;
                             select.value = this.state.selectedCameraId;
+                            // Persist partial choice? No, let user confirm
                         }
+                    } else {
+                        const opt = document.createElement('option');
+                        opt.text = "No cameras found";
+                        select.appendChild(opt);
                     }
                 } catch (e) {
                     console.error('List cameras error', e);
@@ -967,7 +962,6 @@
 
         const scanner = new ScannerManager(appState, (result) => {
             const text = result.getText();
-            // Map simple format name
             const format = result.getBarcodeFormat() || 'QR_CODE';
 
             if (appState.addHistory({ content: text, format })) {
@@ -1068,15 +1062,13 @@
         $('#format-select').onchange = (e) => {
             appState.scanFormat = e.target.value;
             appState.persist();
-            // html5-qrcode scans most things by default or we need to add formats to config
-            // For now, restarting is good practice
             if (appState.isScanning) {
                 scanner.start();
             }
         };
 
         $('#btn-snapshot').onclick = () => {
-            const video = document.querySelector('#scanner-container video');
+            const video = document.getElementById('video-feed');
             if (!video || !video.srcObject) {
                 showToast('Camera not active');
                 return;
@@ -1109,16 +1101,20 @@
         };
 
         $('#btn-switch-cam').onclick = async () => {
-            const devices = await Html5Qrcode.getCameras();
-            if (devices.length < 2) {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(d => d.kind === 'videoinput');
+
+            if (videoDevices.length < 2) {
                 showToast('No other camera found');
                 return;
             }
 
-            const currentIdx = devices.findIndex(d => d.id === appState.selectedCameraId);
-            const nextIdx = (currentIdx + 1) % devices.length;
-            appState.selectedCameraId = devices[nextIdx].id;
+            const currentIdx = videoDevices.findIndex(d => d.deviceId === appState.selectedCameraId);
+            const nextIdx = (currentIdx + 1) % videoDevices.length;
+            appState.selectedCameraId = videoDevices[nextIdx].deviceId;
             appState.persist();
+
+            // Update Select UI just in case it's open
             $('#camera-select').value = appState.selectedCameraId;
 
             if (appState.isScanning) {
@@ -1141,7 +1137,7 @@
             }
         });
 
-        // Initialize
+        // Initialize display state
         (async function init() {
             $('#resolution-select').value = appState.selectedResolution || '720p';
             $('#format-select').value = appState.scanFormat || 'qr';
