@@ -39,7 +39,7 @@
             color: var(--text-primary);
             font-family: var(--font-family);
             height: 100vh;
-            height: 100dvh;
+            height: 100svh;
             display: flex;
             flex-direction: column;
             overflow: hidden;
@@ -207,17 +207,20 @@
 
         /* Controls Bar */
         #controls-bar {
-            background: var(--bg-primary);
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(10px);
             padding: 1rem;
-            padding-bottom: max(1rem, var(--safe-area-bottom));
+            padding-bottom: max(1.5rem, var(--safe-area-bottom));
             display: grid;
             grid-template-columns: 1fr auto 1fr;
             gap: 1rem;
             align-items: center;
             border-top: 1px solid var(--border);
             z-index: 1000;
-            position: relative;
-            flex-shrink: 0;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
             min-height: 80px;
         }
 
@@ -256,7 +259,7 @@
             padding: 1.5rem;
             transform: translateY(110%);
             transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-            z-index: 100;
+            z-index: 2000;
             max-height: 80vh;
             overflow-y: auto;
             box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
@@ -364,7 +367,7 @@
             position: fixed;
             inset: 0;
             background: rgba(0, 0, 0, 0.6);
-            z-index: 90;
+            z-index: 1500;
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.3s;
@@ -388,7 +391,7 @@
             opacity: 0;
             transition: all 0.3s;
             pointer-events: none;
-            z-index: 200;
+            z-index: 3000;
             font-size: 0.9rem;
             border: 1px solid var(--border);
         }
@@ -526,6 +529,18 @@
             <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 2rem;">
                 <div>Active Res: <span id="debug-res">-</span></div>
                 <div>Frame rate: <span id="debug-fps">-</span></div>
+            </div>
+
+            <div style="margin-top: 1.5rem;">
+                <button id="btn-snapshot"
+                    style="width: 100%; padding: 0.75rem; background: var(--border); color: var(--text-primary); border: none; border-radius: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z">
+                        </path>
+                        <circle cx="12" cy="13" r="4"></circle>
+                    </svg>
+                    Take Debug Snapshot
+                </button>
             </div>
         </div>
 
@@ -744,7 +759,8 @@
 
                 } catch (err) {
                     console.error('Start failed', err);
-                    $('#camera-status').textContent = 'Error: ' + err;
+                    const statusEl = $('#camera-status');
+                    if (statusEl) statusEl.textContent = 'Error: ' + err;
 
                     // Fallback (auto res)
                     if ((err.name === 'OverconstrainedError' || err.toString().includes('OverconstrainedError')) && this.state.selectedResolution !== 'auto') {
@@ -755,7 +771,8 @@
 
                     this.state.isScanning = false;
                     this.updateUI();
-                    if ($('#video-feed')) $('#video-feed').style.display = 'block'; // Show my video placeholder again
+                    const videoFeed = $('#video-feed');
+                    if (videoFeed) videoFeed.style.display = 'block'; // Show my video placeholder again
                 }
             }
 
@@ -812,26 +829,39 @@
             }
 
             updateUI() {
+                const camStatus = $('#camera-status');
+                const playIcon = $('.icon-play');
+                const stopIcon = $('.icon-stop');
+                const toggleBtn = $('#btn-toggle-scan');
+                const guide = $('.overlay-guide');
+                const torchBtn = $('#btn-torch');
+
                 if (this.state.isScanning) {
-                    $('#camera-status').style.display = 'none';
-                    $('.icon-play').style.display = 'none';
-                    $('.icon-stop').style.display = 'block';
-                    $('#btn-toggle-scan').classList.add('stop');
-                    $('#btn-toggle-scan').setAttribute('aria-label', 'Stop Scanning');
+                    if (camStatus) camStatus.style.display = 'none';
+                    if (playIcon) playIcon.style.display = 'none';
+                    if (stopIcon) stopIcon.style.display = 'block';
+                    if (toggleBtn) {
+                        toggleBtn.classList.add('stop');
+                        toggleBtn.setAttribute('aria-label', 'Stop Scanning');
+                    }
 
                     // The library renders a shaded region if qrbox is set, but we have a custom overlay too.
                     // Let's keep ours for consistency.
-                    $('.overlay-guide').style.opacity = '1';
+                    if (guide) guide.style.opacity = '1';
 
                 } else {
-                    $('#camera-status').style.display = 'block';
-                    $('#camera-status').textContent = 'Scanner Paused';
-                    $('.icon-play').style.display = 'block';
-                    $('.icon-stop').style.display = 'none';
-                    $('#btn-toggle-scan').classList.remove('stop');
-                    $('#btn-toggle-scan').setAttribute('aria-label', 'Start Scanning');
-                    $('.overlay-guide').style.opacity = '0.3';
-                    $('#btn-torch').style.display = 'none';
+                    if (camStatus) {
+                        camStatus.style.display = 'block';
+                        camStatus.textContent = 'Scanner Paused';
+                    }
+                    if (playIcon) playIcon.style.display = 'block';
+                    if (stopIcon) stopIcon.style.display = 'none';
+                    if (toggleBtn) {
+                        toggleBtn.classList.remove('stop');
+                        toggleBtn.setAttribute('aria-label', 'Start Scanning');
+                    }
+                    if (guide) guide.style.opacity = '0.3';
+                    if (torchBtn) torchBtn.style.display = 'none';
                 }
             }
 
@@ -1042,6 +1072,39 @@
             // For now, restarting is good practice
             if (appState.isScanning) {
                 scanner.start();
+            }
+        };
+
+        $('#btn-snapshot').onclick = () => {
+            const video = document.querySelector('#scanner-container video');
+            if (!video || !video.srcObject) {
+                showToast('Camera not active');
+                return;
+            }
+
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                // Add timestamp and settings text to image for easier debugging
+                ctx.fillStyle = "rgba(0,0,0,0.5)";
+                ctx.fillRect(0, 0, canvas.width, 40);
+                ctx.fillStyle = "#fff";
+                ctx.font = "20px monospace";
+                ctx.fillText(`Debug: ${canvas.width}x${canvas.height} | ${appState.selectedCameraId}`, 10, 25);
+
+                const link = document.createElement('a');
+                link.download = `scan-debug-${Date.now()}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                showToast('Snapshot saved');
+                closeDrawers();
+            } catch (e) {
+                console.error('Snapshot failed', e);
+                showToast('Snapshot failed');
             }
         };
 
