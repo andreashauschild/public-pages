@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Code Scanner</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            aspect-ratio: 4/3;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            max-width: 320px;
+            aspect-ratio: 1;
+            border: 3px solid rgba(0, 255, 136, 0.8);
+            border-radius: 12px;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4);
+        }
+
+        .overlay::before,
+        .overlay::after {
+            content: '';
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border-color: #00ff88;
+            border-style: solid;
+        }
+
+        .overlay::before {
+            top: -3px;
+            left: -3px;
+            border-width: 4px 0 0 4px;
+            border-radius: 8px 0 0 0;
+        }
+
+        .overlay::after {
+            bottom: -3px;
+            right: -3px;
+            border-width: 0 4px 4px 0;
+            border-radius: 0 0 8px 0;
+        }
+
+        .camera-info {
+            background: rgba(0, 0, 0, 0.8);
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+
+        .camera-info p {
+            margin: 5px 0;
+        }
+
+        .camera-info strong {
+            color: #00ff88;
+        }
+
+        .result-container {
+            margin-top: 20px;
+            padding: 20px;
+            background: #16213e;
+            border-radius: 12px;
+            border: 2px solid #0f3460;
+        }
+
+        .result-container h2 {
+            font-size: 1rem;
+            margin-bottom: 10px;
+            color: #888;
+        }
+
+        .result {
+            padding: 15px;
+            background: #0f3460;
+            border-radius: 8px;
+            word-break: break-all;
+            font-family: monospace;
+            min-height: 50px;
+        }
+
+        .result.success {
+            border: 2px solid #00ff88;
+            color: #00ff88;
+        }
+
+        .result.empty {
+            color: #666;
+            font-style: italic;
+        }
+
+        .result-list {
+            margin-top: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .result-item {
+            padding: 10px;
+            background: #1a1a2e;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            font-size: 0.85rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .result-item .text {
+            flex: 1;
+            word-break: break-all;
+            margin-right: 10px;
+        }
+
+        .result-item .time {
+            color: #666;
+            font-size: 0.75rem;
+            white-space: nowrap;
+        }
+
+        .controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-start {
+            background: #00ff88;
+            color: #000;
+        }
+
+        .btn-stop {
+            background: #ff4757;
+            color: #fff;
+        }
+
+        .btn-clear {
+            background: #576574;
+            color: #fff;
+        }
+
+        .error {
+            background: #ff4757;
+            color: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+
+        .settings {
+            background: rgba(0, 0, 0, 0.8);
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .settings label {
+            font-size: 0.9rem;
+            color: #ccc;
+        }
+
+        .settings select {
+            flex: 1;
+            min-width: 150px;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            background: #16213e;
+            color: #fff;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+
+        .settings select:focus {
+            outline: 2px solid #00ff88;
+        }
+
+        .settings input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            vertical-align: middle;
+            margin-right: 5px;
+            cursor: pointer;
+        }
+
+        .status {
+            text-align: center;
+            padding: 10px;
+            color: #888;
+            font-size: 0.9rem;
+        }
+
+        .status.scanning {
+            color: #00ff88;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>📷 QR Code Scanner</h1>
+
+    <div class="video-container">
+        <video id="video" playsinline></video>
+        <div class="overlay"></div>
+    </div>
+
+    <div class="camera-info" id="cameraInfo">
+        <p><strong>Requested:</strong> <span id="requested">--</span></p>
+        <p><strong>Actual Resolution:</strong> <span id="resolution">--</span></p>
+        <p><strong>Reader Mode:</strong> <span id="strategy">--</span></p>
+        <p><strong>Frame Rate:</strong> <span id="frameRate">--</span></p>
+        <p><strong>Max Supported:</strong> <span id="maxResolution">--</span></p>
+    </div>
+
+    <div class="settings">
+        <label for="camera-select">Camera:</label>
+        <select id="camera-select">
+            <option value="">Loading cameras...</option>
+        </select>
+    </div>
+
+    <div class="settings">
+        <label for="resolution-select">Resolution:</label>
+        <select id="resolution-select">
+            <option value="default">Default (Auto)</option>
+            <option value="640x480">640 x 480 (VGA)</option>
+            <option value="1280x720" selected>1280 x 720 (HD)</option>
+            <option value="1920x1080">1920 x 1080 (Full HD)</option>
+            <option value="2560x1440">2560 x 1440 (QHD)</option>
+            <option value="3840x2160">3840 x 2160 (4K)</option>
+            <option value="max">Maximum Available</option>
+        </select>
+
+        <label for="reader-type" style="margin-left: 15px;">
+            <input type="checkbox" id="reader-type" checked> QR Only Mode (recommended)
+        </label>
+    </div>
+
+    <p class="status" id="status">Click "Start Scanner" to begin</p>
+
+    <div class="controls">
+        <button class="btn-start" id="startBtn">Start Scanner</button>
+        <button class="btn-stop" id="stopBtn" disabled>Stop</button>
+        <button class="btn-clear" id="clearBtn">Clear</button>
+    </div>
+
+    <div class="result-container">
+        <h2>Latest Result</h2>
+        <div class="result empty" id="latestResult">No QR code scanned yet</div>
+
+        <h2 style="margin-top: 15px;">Scan History</h2>
+        <div class="result-list" id="resultList"></div>
+    </div>
+
+    <div class="error" id="error" style="display: none;"></div>
+</div>
+
+<!-- Load ZXing library v0.21.3 from CDN -->
+<script type="module">
+    import {
+        BrowserMultiFormatReader,
+        BrowserQRCodeReader,
+        DecodeHintType,
+        BarcodeFormat
+    } from 'https://esm.sh/@zxing/library@0.21.3';
+
+    let codeReader = null;
+    let controls = null;
+
+    // Configure hints for better scanning
+    function createReader(qrOnly = false) {
+        const hints = new Map();
+        hints.set(DecodeHintType.TRY_HARDER, true);
+
+        let reader;
+        if (qrOnly) {
+            reader = new BrowserQRCodeReader(hints);
+            console.log('QR-Only Reader created');
+        } else {
+            reader = new BrowserMultiFormatReader(hints);
+            console.log('MultiFormat Reader created');
+        }
+
+        reader.timeBetweenDecodingAttempts = 100;
+        return reader;
+    }
+
+    function updateCameraInfo(stream, requestedLabel = '--', strategyUsed = '--') {
+        const track = stream.getVideoTracks()[0];
+        const settings = track.getSettings();
+        const capabilities = track.getCapabilities?.() || {};
+
+        document.getElementById('requested').textContent = requestedLabel;
+        document.getElementById('resolution').textContent =
+            `${settings.width} x ${settings.height}`;
+        document.getElementById('strategy').textContent = strategyUsed;
+        document.getElementById('frameRate').textContent =
+            `${settings.frameRate?.toFixed(1) || 'N/A'} fps`;
+        document.getElementById('maxResolution').textContent =
+            capabilities.width?.max && capabilities.height?.max
+                ? `${capabilities.width.max} x ${capabilities.height.max}`
+                : 'N/A';
+    }
+
+    function addResult(text) {
+        const time = new Date().toLocaleTimeString();
+
+        // Update latest result
+        const latestEl = document.getElementById('latestResult');
+        latestEl.textContent = text;
+        latestEl.classList.remove('empty');
+        latestEl.classList.add('success');
+
+        // Add to history
+        const listEl = document.getElementById('resultList');
+        const item = document.createElement('div');
+        item.className = 'result-item';
+        item.innerHTML = `
+        <span class="text">${escapeHtml(text)}</span>
+        <span class="time">${time}</span>
+      `;
+        listEl.insertBefore(item, listEl.firstChild);
+
+        // Vibrate on mobile if supported
+        if (navigator.vibrate) {
+            navigator.vibrate(200);
+        }
+
+        // Flash the overlay green briefly
+        const overlay = document.querySelector('.overlay');
+        overlay.style.borderColor = '#00ff88';
+        overlay.style.boxShadow = '0 0 20px #00ff88, 0 0 0 9999px rgba(0, 0, 0, 0.4)';
+        setTimeout(() => {
+            overlay.style.borderColor = 'rgba(0, 255, 136, 0.8)';
+            overlay.style.boxShadow = '0 0 0 9999px rgba(0, 0, 0, 0.4)';
+        }, 300);
+
+        // Play a beep sound
+        try {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            oscillator.frequency.value = 1800;
+            oscillator.type = 'sine';
+            gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            oscillator.start(audioCtx.currentTime);
+            oscillator.stop(audioCtx.currentTime + 0.1);
+        } catch (e) {
+            // Audio not supported, ignore
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function showError(message) {
+        const errorEl = document.getElementById('error');
+        errorEl.textContent = message;
+        errorEl.style.display = 'block';
+    }
+
+    function hideError() {
+        document.getElementById('error').style.display = 'none';
+    }
+
+    function setStatus(message, scanning = false) {
+        const statusEl = document.getElementById('status');
+        statusEl.textContent = message;
+        statusEl.className = scanning ? 'status scanning' : 'status';
+    }
+
+    // Populate camera list on load
+    async function populateCameraList() {
+        try {
+            // Request permission first (and stop it right after)
+            const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+            tempStream.getTracks().forEach(track => track.stop());
+
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(d => d.kind === 'videoinput');
+
+            const select = document.getElementById('camera-select');
+            select.innerHTML = '';
+
+            if (videoDevices.length === 0) {
+                select.innerHTML = '<option value="">No cameras found</option>';
+                return;
+            }
+
+            videoDevices.forEach((device, index) => {
+                const option = document.createElement('option');
+                option.value = device.deviceId;
+                option.text = device.label || `Camera ${index + 1}`;
+                select.appendChild(option);
+            });
+
+            console.log('Found cameras:', videoDevices.length);
+        } catch (e) {
+            console.error('Error listing cameras:', e);
+            document.getElementById('camera-select').innerHTML =
+                '<option value="">Camera access denied</option>';
+        }
+    }
+
+    // Call on load
+    populateCameraList();
+
+    window.startScanner = async function() {
+        hideError();
+
+        try {
+            const qrOnly = document.getElementById('reader-type').checked;
+            codeReader = createReader(qrOnly);
+
+            const selectedValue = document.getElementById('resolution-select').value;
+            const selectedLabel = document.getElementById('resolution-select').selectedOptions[0].text;
+            const selectedCamera = document.getElementById('camera-select').value;
+
+            setStatus(`Starting camera (${selectedLabel})...`);
+            document.getElementById('startBtn').disabled = true;
+
+            const video = document.getElementById('video');
+
+            // Build constraints based on selection
+            let videoConstraints = {};
+
+            // Use selected camera or default to environment facing
+            if (selectedCamera) {
+                videoConstraints.deviceId = { exact: selectedCamera };
+            } else {
+                videoConstraints.facingMode = 'environment';
+            }
+
+            if (selectedValue === 'max') {
+                videoConstraints.width = { ideal: 4096 };
+                videoConstraints.height = { ideal: 2160 };
+            } else if (selectedValue !== 'default') {
+                const [width, height] = selectedValue.split('x').map(Number);
+                videoConstraints.width = { ideal: width };
+                videoConstraints.height = { ideal: height };
+            }
+
+            const constraints = {
+                audio: false,
+                video: videoConstraints
+            };
+
+            console.log('Starting decode with constraints:', JSON.stringify(constraints));
+
+            let scanCount = 0;
+            let lastFoundTime = 0;
+
+            // Use decodeFromConstraints - this handles everything internally
+            // and is the most reliable method for continuous scanning
+            controls = await codeReader.decodeFromConstraints(
+                constraints,
+                video,
+                (result, error) => {
+                    scanCount++;
+
+                    // Log less frequently to reduce console noise
+                    if (scanCount % 200 === 0) {
+                        console.log(`Scanning... ${scanCount} frames processed`);
+                    }
+
+                    // Update status with scan count periodically
+                    if (scanCount % 30 === 0) {
+                        setStatus(`Scanning... (${scanCount} frames)`, true);
+                    }
+
+                    if (result) {
+                        // Prevent duplicate scans within 2 seconds
+                        const now = Date.now();
+                        if (now - lastFoundTime > 2000) {
+                            console.log('✅ BARCODE FOUND:', result.getText());
+                            addResult(result.getText());
+                            lastFoundTime = now;
+                        }
+                    }
+
+                    // Ignore normal "not found" errors - these happen every frame without a barcode
+                    // Only log truly unexpected errors
+                    if (error) {
+                        const errorStr = String(error);
+                        const isNormalError =
+                            errorStr.includes('NotFoundException') ||
+                            errorStr.includes('No MultiFormat Readers') ||
+                            errorStr.includes('selectBestPatterns') ||
+                            errorStr.includes('FinderPatternFinder') ||
+                            error.name === 'NotFoundException' ||
+                            error.name === 'N' ||
+                            error.name === 't';  // minified error name
+
+                        // Don't log normal scan errors
+                        if (!isNormalError) {
+                            console.warn('Unexpected decode error:', error);
+                        }
+                    }
+                }
+            );
+
+            console.log('Decode started, controls:', controls);
+
+            // Wait a moment for video to initialize, then get info
+            setTimeout(() => {
+                if (video.srcObject) {
+                    const readerMode = qrOnly ? 'QR-Only' : 'MultiFormat';
+                    updateCameraInfo(video.srcObject, selectedLabel, readerMode);
+                }
+            }, 500);
+
+            setStatus('Scanning... Point camera at barcode', true);
+            document.getElementById('stopBtn').disabled = false;
+
+        } catch (err) {
+            console.error('Scanner error:', err);
+            showError(`Camera error: ${err.message}`);
+            setStatus('Error starting scanner');
+            document.getElementById('startBtn').disabled = false;
+        }
+    };
+
+    window.stopScanner = function() {
+        console.log('stopScanner called');
+
+        if (controls) {
+            console.log('Stopping controls...');
+            try {
+                controls.stop();
+            } catch (e) {
+                console.log('Controls stop error:', e);
+            }
+            controls = null;
+        }
+
+        if (codeReader) {
+            console.log('Resetting codeReader...');
+            try {
+                codeReader.reset();
+            } catch (e) {
+                console.log('CodeReader reset error:', e);
+            }
+            codeReader = null;
+        }
+
+        // Also stop video stream if still active
+        const video = document.getElementById('video');
+        if (video.srcObject) {
+            console.log('Stopping video tracks...');
+            video.srcObject.getTracks().forEach(track => {
+                track.stop();
+                console.log('Track stopped:', track.label);
+            });
+            video.srcObject = null;
+        }
+
+        setStatus('Scanner stopped');
+        document.getElementById('startBtn').disabled = false;
+        document.getElementById('stopBtn').disabled = true;
+
+        // Reset camera info
+        document.getElementById('requested').textContent = '--';
+        document.getElementById('resolution').textContent = '--';
+        document.getElementById('strategy').textContent = '--';
+        document.getElementById('frameRate').textContent = '--';
+        document.getElementById('maxResolution').textContent = '--';
+
+        console.log('Scanner stopped successfully');
+    };
+
+    window.clearResults = function() {
+        document.getElementById('resultList').innerHTML = '';
+        const latestEl = document.getElementById('latestResult');
+        latestEl.textContent = 'No QR code scanned yet';
+        latestEl.classList.add('empty');
+        latestEl.classList.remove('success');
+    };
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+        if (controls) controls.stop();
+    });
+
+    // Restart scanner when resolution changes (if currently scanning)
+    document.getElementById('resolution-select').addEventListener('change', () => {
+        if (controls) {
+            window.stopScanner();
+            setTimeout(() => window.startScanner(), 100);
+        }
+    });
+
+    // Button event listeners
+    document.getElementById('startBtn').addEventListener('click', () => {
+        window.startScanner();
+    });
+
+    document.getElementById('stopBtn').addEventListener('click', () => {
+        window.stopScanner();
+    });
+
+    document.getElementById('clearBtn').addEventListener('click', () => {
+        window.clearResults();
+    });
+</script>
+</body>
+</html>
