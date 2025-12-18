@@ -231,6 +231,9 @@
                 <label for="qr-content">Content</label>
                 <textarea id="qr-content" rows="4"
                     placeholder="Enter text, URL, or data...">https://example.com</textarea>
+                <div id="char-count"
+                    style="text-align: right; font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem;">19
+                    chars</div>
             </div>
 
             <div class="color-picker-group form-group">
@@ -373,12 +376,18 @@
         $('#btn-generate').addEventListener('click', generateQR);
 
         ['input', 'change'].forEach(evt => {
-            $('#qr-content').addEventListener(evt, generateQR);
+            $('#qr-content').addEventListener(evt, (e) => {
+                generateQR();
+                $('#char-count').textContent = `${e.target.value.length} chars`;
+            });
             $('#color-fg').addEventListener(evt, generateQR);
             $('#color-bg').addEventListener(evt, generateQR);
             $('#opt-ecc').addEventListener(evt, generateQR);
             $('#opt-size').addEventListener(evt, generateQR);
         });
+
+        // Initialize char count
+        $('#char-count').textContent = `${$('#qr-content').value.length} chars`;
 
         $('#btn-download').addEventListener('click', () => {
             // Find the image created by qrcodejs
