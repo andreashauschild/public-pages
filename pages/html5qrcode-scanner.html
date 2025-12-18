@@ -39,6 +39,7 @@
             color: var(--text-primary);
             font-family: var(--font-family);
             height: 100vh;
+            height: 100dvh;
             display: flex;
             flex-direction: column;
             overflow: hidden;
@@ -214,7 +215,7 @@
             gap: 1rem;
             align-items: center;
             border-top: 1px solid var(--border);
-            z-index: 20;
+            z-index: 1000;
             position: relative;
             flex-shrink: 0;
             min-height: 80px;
@@ -507,8 +508,8 @@
                     <option value="auto">Auto (Default)</option>
                     <option value="max">Maximum Available</option>
                     <option value="4K">4K (3840x2160)</option>
-                    <option value="1080p">Full HD (1920x1080)</option>
-                    <option value="720p" selected>HD (1280x720)</option>
+                    <option value="1080p" selected>Full HD (1920x1080)</option>
+                    <option value="720p">HD (1280x720)</option>
                     <option value="480p">SD (640x480)</option>
                 </select>
             </div>
@@ -609,7 +610,7 @@
         class AppState {
             constructor() {
                 this.selectedCameraId = localStorage.getItem(STORAGE_KEY_CAM) || null;
-                this.selectedResolution = localStorage.getItem(STORAGE_KEY_RES) || '720p';
+                this.selectedResolution = localStorage.getItem(STORAGE_KEY_RES) || '1080p';
                 this.scanFormat = localStorage.getItem(STORAGE_KEY_FMT) || 'qr';
                 this.history = JSON.parse(localStorage.getItem(STORAGE_KEY_HIST) || '[]');
                 this.isScanning = false;
@@ -697,15 +698,14 @@
                     videoConstraints.deviceId = { exact: this.state.selectedCameraId };
                 }
 
-                // Calculate qrbox size (scanning region)
-                // Make it responsive: larger on mobile
-                const qrBoxSize = Math.min(window.innerWidth, window.innerHeight) * 0.75;
-
+                // Use full scan area for better detection of high-density codes
+                // qrbox is removed to allow the library to scan the entire video feed
                 return {
                     fps: 10,
-                    qrbox: { width: qrBoxSize, height: qrBoxSize },
+                    // qrbox: { width: qrBoxSize, height: qrBoxSize }, // Removed to scan full frame
                     aspectRatio: window.innerWidth / window.innerHeight,
-                    videoConstraints: videoConstraints
+                    videoConstraints: videoConstraints,
+                    useBarCodeDetectorIfSupported: true
                 };
             }
 
