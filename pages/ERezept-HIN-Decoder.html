@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-Rezept Decoder & Link Generator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-sha3/0.8.0/sha3.min.js"></script>
+    <style>
+        :root { --bg: #1e1e1e; --panel: #252526; --accent: #007acc; --text: #d4d4d4; --green: #4ec9b0; --key: #9cdcfe; }
+        body { background-color: var(--bg); color: var(--text); font-family: 'Segoe UI', Consolas, monospace; padding: 20px; margin: 0; }
+        .container { max-width: 900px; margin: 0 auto; }
+
+        h2 { border-bottom: 1px solid #333; padding-bottom: 10px; color: #fff; }
+
+        .input-group { background: var(--panel); padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); margin-bottom: 20px; }
+        textarea { width: 100%; height: 80px; background: #111; color: #fff; border: 1px solid #444; padding: 10px; font-family: monospace; border-radius: 4px; box-sizing: border-box; }
+        button { background: var(--accent); color: white; border: none; padding: 10px 20px; font-size: 16px; cursor: pointer; margin-top: 10px; border-radius: 4px; font-weight: bold; }
+        button:hover { background: #0062a3; }
+
+        .grid { display: grid; grid-template-columns: 180px 1fr; gap: 10px; background: var(--panel); padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        .label { color: var(--key); font-weight: bold; align-self: center; }
+        .value { background: #111; padding: 8px; border-radius: 4px; word-break: break-all; border: 1px solid #333; }
+        .hash-box { border: 1px solid var(--green); color: var(--green); font-weight: bold; }
+
+        /* Link Styling */
+        a.api-link { color: var(--green); text-decoration: none; border-bottom: 1px dashed var(--green); word-break: break-all; display: block; padding: 10px; background: #111; border-radius: 4px; }
+        a.api-link:hover { background: #1a3c35; border-bottom-style: solid; }
+
+        pre { white-space: pre-wrap; word-wrap: break-word; font-size: 13px; color: #ce9178; margin: 0; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>ERezept Decoder</h2>
+
+    <div class="input-group">
+        <p>URL aus QR-Code einfügen:</p>
+        <textarea id="urlInput" placeholder="https://eprescription-test.hin.ch/#CHMED16A1...">https://eprescription-test.hin.ch/#CHMED16A1H4sIAAAAAAAEA61T32vbMBD+Vw69Lg6Sbdmyn9Z0awisISyBwcYeZPsai9pykOWUEvq/7xS2lUGhdM2D4H58+nR3uu/EribfspLlGRecx3TyvGAz9slTMOaxjEQccbETWcl5magPXJBBgFVDgKbKRaVQRFojpqKIVBrloo6ULiRWddZIJOgtNrvHA7IyOdum1j1aP7Lyx4ldHQ4rO3pHZGtdt7DARru7P/xSFUqenb8E62qj63tWihnbThWR8KfZazRJmiVxGtpaPVfyP0RC5jJLMniZKX5DSUpxJWPxMtFbeotVKotUvZ8oT2NVyAsMKZFKcn6B1i42IyXTIs3S988oI3moJHuV6OeMbW4Mdk1Y8uBs6xZ7TUtOVzfaG9p/Vp7Y4iwzUcQ8yCwOFV4b/0i4b8Z6dL6dHMU+99p0FFxq2+ju7mM3eDfvg7Ru1qSl5wxFlmgbJDnRDn35nSQflk5P4cKmHWy4wEUMSSohy0GFP996hxg0f2u8xw5dgxC+8Ls5UFClpPmnGfvak/LYopvwWjuEHY4eNg7H2pmDN4Odwz8uPBjfgm8RjtqZYRph9EN9D8MZPM5h1+KI0Jt966Futd0j6BG86RH2A44wWKCWwVgi0QTRhA50PTamNjYYNryLDT3VddDqIwEGqBAcHg0+UELvtbFz9vQLPKwAxusEAAA=&i=Sascha+Bergmann+%28HIN%7Csasber2%29&t=1764687651&s=3066023100a7a21ffa5bfa8d950d37e52b4812655a25592d4b603249dc27aba307494dc8bbef2392b60e3fc3c31cf45555057061010231009e58661beae657231d1ebc55ed5efb7f8b75516d31d62a74af0944dd235df1e9e89ca5f9b47842576a8935626cb7cc37</textarea>
+        <button onclick="analyze()">Generieren</button>
+    </div>
+
+    <div id="output" style="display:none;">
+
+        <h3>1. Berechnete API Parameter</h3>
+        <div class="grid">
+            <div class="label">Data Hash</div>
+            <div class="value hash-box" id="outHash"></div>
+
+            <div class="label">Identity</div>
+            <div class="value" id="outIdentity"></div>
+
+            <div class="label">Timestamp</div>
+            <div class="value" id="outTime"></div>
+
+            <div class="label">Signature</div>
+            <div class="value" id="outSign" style="font-size: 11px; color: #888;"></div>
+        </div>
+
+        <h3>2. Fertiger API Link (zum Testen)</h3>
+        <div class="input-group">
+            <a id="generatedLink" href="#" target="_blank" class="api-link">Link wird generiert...</a>
+        </div>
+
+        <h3>3. Interner Payload & JSON</h3>
+        <div class="grid">
+            <div class="label">Payload String</div>
+            <div class="value" id="outPayload" style="font-size: 11px; color: #888;"></div>
+        </div>
+        <div class="input-group">
+            <pre id="outJson"></pre>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    async function analyze() {
+        const url = document.getElementById('urlInput').value.trim();
+        const outputDiv = document.getElementById('output');
+
+        try {
+            if (!url.includes('#CHMED16A1')) throw new Error("URL enthält kein gültiges #CHMED16A1 Fragment.");
+
+            // 1. Parsing
+            const fragment = url.split('#')[1];
+            const payloadString = fragment.split('&')[0];
+            const paramString = fragment.substring(payloadString.length);
+            const params = new URLSearchParams(paramString);
+
+            const identity = params.get('i');
+            const timestamp = params.get('t');
+            const signature = params.get('s');
+
+            if (!identity || !timestamp || !signature) throw new Error("Parameter i, t oder s fehlen in der URL.");
+
+            // 2. Hashing (Keccak-256)
+            if (typeof keccak256 === 'undefined') throw new Error("Keccak Library nicht geladen.");
+            const calculatedHash = "0x" + keccak256(payloadString);
+
+            // 3. Link Generierung
+            const baseUrl = "https://eprescription-test.hin.ch/api/eprescription/verify";
+            // Wichtig: encodeURIComponent für Identity, da Leerzeichen und Sonderzeichen enthalten sind!
+            const fullApiUrl = `${baseUrl}?data_hash=${calculatedHash}&identity=${encodeURIComponent(identity)}&timestamp=${timestamp}&signature=${signature}`;
+
+            // 4. UI Update
+            document.getElementById('outHash').innerText = calculatedHash;
+            document.getElementById('outIdentity').innerText = identity;
+            document.getElementById('outTime').innerText = timestamp;
+            document.getElementById('outSign').innerText = signature;
+            document.getElementById('outPayload').innerText = payloadString.substring(0, 50) + "...";
+
+            // Link setzen
+            const linkEl = document.getElementById('generatedLink');
+            linkEl.href = fullApiUrl;
+            linkEl.innerText = fullApiUrl;
+
+            // 5. JSON Decoding (Optional für Vorschau)
+            const base64Content = payloadString.replace('CHMED16A1', '');
+            const binaryString = atob(base64Content);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+
+            try {
+                const ds = new DecompressionStream('gzip');
+                const writer = ds.writable.getWriter();
+                writer.write(bytes);
+                writer.close();
+                const response = new Response(ds.readable);
+                const jsonText = await response.text();
+                document.getElementById('outJson').innerText = JSON.stringify(JSON.parse(jsonText), null, 4);
+            } catch (e) {
+                document.getElementById('outJson').innerText = "Vorschau nicht möglich: " + e.message;
+            }
+
+            outputDiv.style.display = 'block';
+
+        } catch (e) {
+            alert("Fehler: " + e.message);
+        }
+    }
+</script>
+
+</body>
+</html>
