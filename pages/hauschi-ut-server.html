@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hauschi's UT Server</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #0a0a0a;
+            color: #e0e0e0;
+            line-height: 1.6;
+        }
+        .hero {
+            background: linear-gradient(135deg, #1a0000 0%, #0a0a2e 50%, #0a0a0a 100%);
+            border-bottom: 2px solid #c0392b;
+            padding: 60px 20px;
+            text-align: center;
+        }
+        .hero h1 {
+            font-size: 2.8em;
+            color: #e74c3c;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            text-shadow: 0 0 20px rgba(231, 76, 60, 0.5);
+        }
+        .hero p {
+            font-size: 1.2em;
+            color: #aaa;
+            margin-top: 10px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        .card {
+            background: #141414;
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+        .card h2 {
+            color: #e74c3c;
+            font-size: 1.5em;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #2a2a2a;
+        }
+        .card h3 {
+            color: #e0e0e0;
+            font-size: 1.1em;
+            margin: 20px 0 10px 0;
+        }
+        .server-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        .info-item {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 3px solid #e74c3c;
+        }
+        .info-item .label {
+            font-size: 0.85em;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .info-item .value {
+            font-size: 1.2em;
+            color: #fff;
+            font-weight: bold;
+            margin-top: 4px;
+        }
+        .connect-box {
+            background: #1a1a1a;
+            border: 2px solid #e74c3c;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .connect-box code {
+            font-size: 1.4em;
+            color: #e74c3c;
+            background: #0a0a0a;
+            padding: 8px 20px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-top: 8px;
+            font-family: 'Consolas', 'Courier New', monospace;
+        }
+        .steps {
+            counter-reset: step;
+            list-style: none;
+            padding: 0;
+        }
+        .steps li {
+            counter-increment: step;
+            padding: 12px 15px 12px 55px;
+            margin-bottom: 10px;
+            background: #1a1a1a;
+            border-radius: 6px;
+            position: relative;
+        }
+        .steps li::before {
+            content: counter(step);
+            position: absolute;
+            left: 15px;
+            top: 12px;
+            background: #e74c3c;
+            color: #fff;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+        a {
+            color: #e74c3c;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+            color: #ff6b6b;
+        }
+        .btn {
+            display: inline-block;
+            background: #e74c3c;
+            color: #fff;
+            padding: 14px 30px;
+            border-radius: 6px;
+            font-size: 1.1em;
+            font-weight: bold;
+            text-decoration: none;
+            margin: 10px 5px;
+            transition: background 0.2s;
+        }
+        .btn:hover {
+            background: #c0392b;
+            text-decoration: none;
+            color: #fff;
+        }
+        .btn-secondary {
+            background: #2a2a2a;
+            border: 1px solid #444;
+        }
+        .btn-secondary:hover {
+            background: #3a3a3a;
+        }
+        .warning {
+            background: #1a1a00;
+            border: 1px solid #f39c12;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+            color: #f1c40f;
+        }
+        .warning strong {
+            color: #f39c12;
+        }
+        .divider {
+            text-align: center;
+            margin: 25px 0;
+            color: #444;
+            font-size: 0.9em;
+        }
+        .divider::before, .divider::after {
+            content: "———";
+            margin: 0 10px;
+        }
+        .screenshot {
+            margin: 25px 0;
+            text-align: center;
+        }
+        .screenshot img {
+            max-width: 100%;
+            border: 1px solid #2a2a2a;
+            border-radius: 6px;
+        }
+        .screenshot p {
+            color: #888;
+            font-size: 0.9em;
+            margin-top: 8px;
+        }
+        @media (max-width: 600px) {
+            .server-info { grid-template-columns: 1fr; }
+            .hero h1 { font-size: 1.8em; }
+        }
+    </style>
+</head>
+<body>
+    <div class="hero">
+        <h1>Hauschi's UT Server</h1>
+        <p>Unreal Tournament 99 &mdash; OldUnreal v469e</p>
+    </div>
+
+    <div class="container">
+
+        <!-- Server Info -->
+        <div class="card">
+            <h2>Server-Infos</h2>
+            <div class="server-info">
+                <div class="info-item">
+                    <div class="label">Servername</div>
+                    <div class="value">Hauschi's UT Server</div>
+                </div>
+                <div class="info-item">
+                    <div class="label">IP-Adresse</div>
+                    <div class="value">85.10.203.54</div>
+                </div>
+                <div class="info-item">
+                    <div class="label">Port</div>
+                    <div class="value">7777 (UDP)</div>
+                </div>
+                <div class="info-item">
+                    <div class="label">Spieler</div>
+                    <div class="value">max. 32</div>
+                </div>
+                <div class="info-item">
+                    <div class="label">Server-Version</div>
+                    <div class="value">OldUnreal v469e</div>
+                </div>
+            </div>
+
+            <div class="screenshot">
+                <img src="serverauswahl.png" alt="Serverauswahl im UT99 Server Browser - Hauschi's UT Server">
+                <p>So sieht der Server im Server-Browser aus &mdash; filtere einfach nach &bdquo;haus&ldquo;</p>
+            </div>
+
+            <div class="connect-box">
+                <strong>So verbindest du dich:</strong><br>
+                Starte UT99, drücke <strong>Tab</strong> oder <strong>~</strong> um die Konsole zu öffnen und tippe:<br>
+                <code>open 85.10.203.54</code>
+            </div>
+            <p style="text-align:center; color:#888; margin-top: 15px;">
+                Das <strong>Server-Passwort</strong> lautet: <strong style="color:#e74c3c;">russe</strong>
+            </p>
+        </div>
+
+        <!-- Download -->
+        <div class="card">
+            <h2>Spiel herunterladen</h2>
+
+            <h3>Option 1: Fertiges ZIP (empfohlen)</h3>
+            <p>Ich habe ein fertiges Paket vorbereitet &mdash; einfach herunterladen, entpacken und losspielen. Kein Installer, kein Patchen nötig.
+               Den <strong>Download-Link</strong> findet ihr in der <strong>Beschreibung des TeamSpeak-Channels &bdquo;Unreal Tournament 99 Server&ldquo;</strong> (See Info).
+               Nach dem Entpacken startet ihr das Spiel über: <code>System\UnrealTournament.exe</code></p>
+
+            <div class="divider">oder</div>
+
+            <h3>Option 2: Selbst installieren</h3>
+            <p>Falls du es lieber selbst einrichten möchtest:</p>
+            <ol class="steps">
+                <li>
+                    Lade den <strong>Unreal Tournament Installer</strong> herunter:<br>
+                    <a href="https://www.oldunreal.com/downloads/unrealtournament/full-game-installers/" target="_blank">
+                        oldunreal.com &rarr; Full Game Installers
+                    </a>
+                </li>
+                <li>
+                    Installiere das Spiel ganz normal auf deinem PC.
+                </li>
+                <li>
+                    Lade den <strong>OldUnreal Patch v469e</strong> für Windows herunter:<br>
+                    <a href="https://github.com/OldUnreal/UnrealTournamentPatches/releases" target="_blank">
+                        GitHub &rarr; UnrealTournamentPatches Releases
+                    </a><br>
+                    Du brauchst die Datei: <code>OldUnreal-UTPatch469e-Windows-x86.zip</code>
+                </li>
+                <li>
+                    Entpacke das ZIP und kopiere <strong>alle Dateien</strong> in dein UT-Installationsverzeichnis
+                    (z.B. <code>C:\UnrealTournament\</code>). Bestehende Dateien <strong>überschreiben</strong>!
+                </li>
+                <li>
+                    Starte das Spiel und verbinde dich auf den Server.
+                </li>
+            </ol>
+
+            <div class="warning">
+                <strong>Wichtig:</strong> Der Server läuft auf Version <strong>v469e</strong>.
+                Damit du dich verbinden kannst, muss dein Spiel ebenfalls auf v469e gepatcht sein!
+            </div>
+        </div>
+
+    </div>
+</body>
+</html>
