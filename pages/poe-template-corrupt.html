@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PoE Double Corrupt Simulator Pro</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0b0b0b;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            background-color: #1a1a1a;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.9);
+            max-width: 900px;
+            width: 100%;
+            border-top: 4px solid #b89355;
+        }
+        h1 {
+            color: #b89355;
+            text-align: center;
+            margin-top: 0;
+            font-size: 26px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .input-group {
+            display: flex;
+            flex-direction: column;
+        }
+        label {
+            margin-bottom: 5px;
+            font-size: 12px;
+            color: #999;
+            text-transform: uppercase;
+        }
+        input {
+            padding: 10px;
+            background-color: #2a2a2a;
+            border: 1px solid #444;
+            color: #fff;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        input:focus {
+            outline: none;
+            border-color: #b89355;
+        }
+        button {
+            width: 100%;
+            padding: 15px;
+            background-color: #8b0000;
+            color: white;
+            border: 1px solid #ff4d4d;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        button:hover {
+            background-color: #b30000;
+            box-shadow: 0 0 15px rgba(255, 77, 77, 0.6);
+        }
+        .results {
+            margin-top: 25px;
+            display: none;
+        }
+        .box {
+            background-color: #222;
+            padding: 20px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            border-left: 4px solid #b89355;
+            position: relative;
+        }
+        .box h2 {
+            margin-top: 0;
+            color: #b89355;
+            font-size: 18px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .result-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 14px;
+            align-items: center;
+        }
+        .profit { color: #4caf50; font-weight: bold; }
+        .loss { color: #f44336; font-weight: bold; }
+        .neutral { color: #2196f3; font-weight: bold; }
+        .per-hour { color: #b89355; font-size: 13px; margin-left: 10px; border-left: 1px solid #555; padding-left: 10px; }
+        .highlight-row {
+            background-color: #1a1a1a;
+            padding: 12px;
+            border-radius: 4px;
+            border: 1px solid #444;
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .highlight-row .flex-between {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+        }
+        .chart-container {
+            position: relative;
+            height: 350px;
+            width: 100%;
+            margin-top: 20px;
+        }
+        .ruin-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .ruin-card {
+            background-color: #161616;
+            padding: 15px 10px;
+            border-radius: 4px;
+            text-align: center;
+            border: 1px solid #333;
+        }
+        .ruin-card .runs {
+            font-size: 12px;
+            color: #999;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        .ruin-card .risk {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .divider {
+            height: 1px;
+            background-color: #333;
+            margin: 10px 0;
+        }
+        .note {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+            font-style: italic;
+        }
+
+        /* --- GLOW ANIMATION (Only for Simulation Boxes) --- */
+        @keyframes updateGlow {
+            0% {
+                box-shadow: 0 0 25px rgba(184, 147, 85, 0.6), inset 0 0 15px rgba(184, 147, 85, 0.2);
+                background-color: #2a251c;
+            }
+            100% {
+                box-shadow: 0 0 0px rgba(184, 147, 85, 0), inset 0 0 0px rgba(184, 147, 85, 0);
+                background-color: #222;
+            }
+        }
+        .glow-active {
+            animation: updateGlow 1.2s ease-out forwards;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Doryani's Institute Simulator</h1>
+
+    <div class="grid">
+        <div class="input-group">
+            <label>Cost: Enlighten Lvl 3 (Chaos)</label>
+            <input type="number" id="costGem" value="850">
+        </div>
+        <div class="input-group">
+            <label>Cost: Temple (Chaos)</label>
+            <input type="number" id="costTemple" value="210">
+        </div>
+        <div class="input-group">
+            <label>Value: Level 4 Jackpot (Chaos)</label>
+            <input type="number" id="valLvl4" value="5320">
+        </div>
+        <div class="input-group">
+            <label>Value: Level 3 Corrupted (Chaos)</label>
+            <input type="number" id="valLvl3" value="89">
+        </div>
+        <div class="input-group">
+            <label>Divine Ratio (Chaos per Div)</label>
+            <input type="number" id="divRatio" value="280" oninput="updateTimeMathLive()">
+        </div>
+        <div class="input-group">
+            <label>Time per Run (Seconds)</label>
+            <input type="number" id="secPerRun" value="90" oninput="updateTimeMathLive()">
+            <div class="note">Type here to live-update the /hr stats!</div>
+        </div>
+        <div class="input-group" style="grid-column: span 2;">
+            <label>Number of Attempts (for Chart & Run Simulator)</label>
+            <input type="number" id="attempts" value="100">
+        </div>
+    </div>
+
+    <button onclick="runSimulation()">Roll the Dice! (Corrupt Gems)</button>
+
+    <div class="results" id="resultsArea">
+
+        <div class="box math-box" style="border-left-color: #4caf50;">
+            <h2 style="color: #4caf50;">Pure Mathematics (Statistical Baseline)</h2>
+            <p style="font-size: 13px; color: #aaa; margin-top: -5px; margin-bottom: 15px;">This is the exact mathematical Expected Value (EV) based purely on your inputted prices. It completely ignores luck, variance, and the random simulator below.</p>
+
+            <div class="result-row">
+                <span>Expected Profit per Single Run:</span>
+                <span id="mathEvRun"></span>
+            </div>
+            <div class="result-row">
+                <span>Expected Profit for <span id="mathTargetRuns"></span> Runs:</span>
+                <span id="mathEvTotal"></span>
+            </div>
+
+            <div class="highlight-row" style="margin-top: 15px; background-color: #111e11; border-color: #2e5a2e;">
+                <div class="flex-between">
+                    <span style="font-size: 15px; color: #fff;">True Expected Profit per Hour:</span>
+                    <span id="mathEvPerHour" style="font-size: 16px; font-weight: bold;"></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="box sim-box">
+            <h2>Your Random Roll (<span id="simAttempts"></span> Attempts)</h2>
+            <p style="font-size: 13px; color: #aaa; margin-top: -5px;">A single session generated using real game probabilities.</p>
+            <div class="result-row"><span>Level 4 Hits (Jackpot):</span> <span id="simLvl4" class="profit"></span></div>
+            <div class="result-row"><span>Level 3 (Consolation Prize):</span> <span id="simLvl3" class="neutral"></span></div>
+            <div class="result-row"><span>Level 2 (Bricked):</span> <span id="simLvl2" class="loss"></span></div>
+            <div class="result-row" style="margin-top: 15px; border-top: 1px solid #444; padding-top: 15px;">
+                <span>Total Profit/Loss:</span> <span id="simFinalProfit" style="font-size: 18px;"></span>
+            </div>
+        </div>
+
+        <div class="box sim-box">
+            <h2>Risk of Ruin (Chance of NO Profit)</h2>
+            <p style="font-size: 13px; color: #aaa; margin-top: -5px;">Dynamically calculated up to your target runs. High volume = Low risk.</p>
+            <div class="ruin-grid" id="ruinGrid">
+            </div>
+        </div>
+
+        <div class="box sim-box">
+            <h2>Monte Carlo Analysis (10,000 Simulations)</h2>
+            <p style="font-size: 13px; color: #aaa; margin-top: -5px;">Shows how 10,000 real players would fare running your setup.</p>
+            <div class="highlight-row">
+                <div class="flex-between">
+                    <span style="font-size: 15px; color: #fff;">Simulated Average per Hour:</span>
+                    <span id="mcProfitPerHour" style="font-size: 16px; font-weight: bold;" class="profit"></span>
+                </div>
+                <div class="flex-between" style="border-top: 1px dashed #555; padding-top: 8px;">
+                    <span style="font-size: 14px; color: #ccc;">Time to complete <span id="timeTarget"></span> runs:</span>
+                    <span id="mcTotalTime" style="font-size: 14px; color: #b89355; font-weight: bold;"></span>
+                </div>
+            </div>
+
+            <div class="result-row" style="margin-top: 20px;">
+                <span style="font-weight: bold;">Statistical Average for <span id="avgTarget"></span> Runs:</span>
+                <span id="mcAverage" class="neutral"></span>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="result-row"><span>Top 1% (Extreme Luck):</span> <span id="mcP99"></span></div>
+            <div class="result-row"><span>Top 20% (Lucky):</span> <span id="mcP80"></span></div>
+            <div class="result-row"><span>Top 40% (Above Average):</span> <span id="mcP60"></span></div>
+            <div class="result-row"><span>Bottom 40% (Below Average):</span> <span id="mcP40"></span></div>
+            <div class="result-row"><span>Bottom 20% (Unlucky):</span> <span id="mcP20"></span></div>
+            <div class="result-row"><span>Bottom 1% (Worst Case):</span> <span id="mcP01"></span></div>
+
+            <div class="divider"></div>
+
+            <div class="result-row"><span>Win Rate for <span id="chartTarget"></span> Runs:</span> <span id="mcWinRate" class="profit"></span></div>
+
+            <div class="chart-container">
+                <canvas id="profitChart"></canvas>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    let profitChart = null;
+    let currentPercentiles = {};
+    let currentAvgProfit = 0;
+    let currentAttempts = 100;
+    let currentSingleProfit = 0;
+
+    // Helper formatting function
+    function formatValue(value, divRatio) {
+        const divTotal = (value / divRatio).toFixed(1);
+        const sign = value > 0 ? '+' : '';
+        const cls = value >= 0 ? 'profit' : 'loss';
+        return `<span class="${cls}">${sign}${Math.round(value).toLocaleString()} c (~${sign}${divTotal} Div)</span>`;
+    }
+
+    // Function to trigger the visual glow
+    function triggerGlow() {
+        // Trigger glow ONLY for Simulation boxes (Gold)
+        const simBoxes = document.querySelectorAll('.sim-box');
+        simBoxes.forEach(box => {
+            box.classList.remove('glow-active');
+            void box.offsetWidth; // Force a DOM reflow to restart the animation immediately
+            box.classList.add('glow-active');
+        });
+    }
+
+    function runSimulation() {
+        const costGem = parseFloat(document.getElementById('costGem').value) || 0;
+        const costTemple = parseFloat(document.getElementById('costTemple').value) || 0;
+        const valLvl4 = parseFloat(document.getElementById('valLvl4').value) || 0;
+        const valLvl3 = parseFloat(document.getElementById('valLvl3').value) || 0;
+        currentAttempts = parseInt(document.getElementById('attempts').value) || 1;
+        const costPerAttempt = costGem + costTemple;
+
+        // Make results visible if they aren't already
+        document.getElementById('resultsArea').style.display = 'block';
+
+        // Trigger the visual glow effect
+        triggerGlow();
+
+        // --- 1. SINGLE RUN (ROLL THE DICE) ---
+        let countLvl4 = 0, countLvl3 = 0, countLvl2 = 0;
+        for(let i = 0; i < currentAttempts; i++) {
+            const roll = Math.random();
+            if(roll < 0.25) countLvl4++;
+            else if(roll < 0.75) countLvl3++;
+            else countLvl2++;
+        }
+        const totalCost = currentAttempts * costPerAttempt;
+        const totalRevenue = (countLvl4 * valLvl4) + (countLvl3 * valLvl3);
+        currentSingleProfit = totalRevenue - totalCost;
+
+        document.getElementById('simAttempts').innerText = currentAttempts;
+        document.getElementById('chartTarget').innerText = currentAttempts;
+        document.getElementById('avgTarget').innerText = currentAttempts;
+        document.getElementById('timeTarget').innerText = currentAttempts;
+        document.getElementById('mathTargetRuns').innerText = currentAttempts;
+
+        document.getElementById('simLvl4').innerText = `${countLvl4}x`;
+        document.getElementById('simLvl3').innerText = `${countLvl3}x`;
+        document.getElementById('simLvl2').innerText = `${countLvl2}x`;
+
+        // --- 2. MONTE CARLO SIMULATION ---
+        const iterations = 10000;
+        let profits = [];
+        let profitableRuns = 0;
+
+        for(let j = 0; j < iterations; j++) {
+            let p4 = 0, p3 = 0;
+            for(let i = 0; i < currentAttempts; i++) {
+                const r = Math.random();
+                if(r < 0.25) p4++;
+                else if(r < 0.75) p3++;
+            }
+            let runProfit = ((p4 * valLvl4) + (p3 * valLvl3)) - totalCost;
+            profits.push(runProfit);
+            if(runProfit > 0) profitableRuns++;
+        }
+
+        profits.sort((a, b) => a - b);
+
+        currentAvgProfit = profits.reduce((a, b) => a + b, 0) / iterations;
+        currentPercentiles = {
+            p99: profits[Math.floor(iterations * 0.99)],
+            p80: profits[Math.floor(iterations * 0.80)],
+            p60: profits[Math.floor(iterations * 0.60)],
+            p40: profits[Math.floor(iterations * 0.40)],
+            p20: profits[Math.floor(iterations * 0.20)],
+            p01: profits[Math.floor(iterations * 0.01)]
+        };
+
+        const winRate = (profitableRuns / iterations) * 100;
+        const winRateEl = document.getElementById('mcWinRate');
+        winRateEl.innerText = `${winRate.toFixed(1)} %`;
+        winRateEl.className = winRate >= 50 ? 'profit' : 'loss';
+
+        // Update the time, hour, and pure math fields
+        updateTimeMathLive();
+
+        // --- 3. DYNAMIC RISK OF RUIN ---
+        let milestones = [];
+        let step = Math.max(1, Math.floor(currentAttempts / 10));
+        for(let i = 1; i <= 10; i++) {
+            if (i * step <= currentAttempts) {
+                milestones.push(i * step);
+            }
+        }
+        if (milestones[milestones.length - 1] !== currentAttempts) {
+            milestones.push(currentAttempts);
+        }
+        milestones = [...new Set(milestones)];
+
+        const ruinIterations = 5000;
+        let ruinHtml = '';
+
+        milestones.forEach(m => {
+            let lossCount = 0;
+            for(let j = 0; j < ruinIterations; j++) {
+                let p4 = 0, p3 = 0;
+                for(let i = 0; i < m; i++) {
+                    const r = Math.random();
+                    if(r < 0.25) p4++;
+                    else if(r < 0.75) p3++;
+                }
+                let totalC = m * costPerAttempt;
+                let totalR = (p4 * valLvl4) + (p3 * valLvl3);
+                if(totalR - totalC <= 0) lossCount++;
+            }
+            let lossPct = ((lossCount / ruinIterations) * 100).toFixed(1);
+            let colorClass = lossPct > 35 ? 'loss' : (lossPct > 15 ? 'neutral' : 'profit');
+
+            ruinHtml += `
+                <div class="ruin-card">
+                    <div class="runs">${m} Runs</div>
+                    <div class="risk ${colorClass}">${lossPct}%</div>
+                </div>
+            `;
+        });
+
+        document.getElementById('ruinGrid').innerHTML = ruinHtml;
+
+        // --- 4. DRAW CHART ---
+        drawChart(profits, parseFloat(document.getElementById('divRatio').value) || 1);
+    }
+
+    // --- STANDALONE FUNCTION TO UPDATE TIME/MATH WITHOUT REROLLING ---
+    function updateTimeMathLive() {
+        if (currentAttempts === 0) return;
+
+        const divRatio = parseFloat(document.getElementById('divRatio').value) || 1;
+        const secPerRun = parseFloat(document.getElementById('secPerRun').value) || 1;
+        const costGem = parseFloat(document.getElementById('costGem').value) || 0;
+        const costTemple = parseFloat(document.getElementById('costTemple').value) || 0;
+        const valLvl4 = parseFloat(document.getElementById('valLvl4').value) || 0;
+        const valLvl3 = parseFloat(document.getElementById('valLvl3').value) || 0;
+
+        // --- PURE MATH CALCULATIONS ---
+        const costPerAttempt = costGem + costTemple;
+        const evPerRun = (0.25 * valLvl4) + (0.50 * valLvl3) - costPerAttempt;
+        const evTotal = evPerRun * currentAttempts;
+        const runsPerHour = 3600 / secPerRun;
+        const mathEvPerHour = evPerRun * runsPerHour;
+
+        document.getElementById('mathEvRun').innerHTML = formatValue(evPerRun, divRatio);
+        document.getElementById('mathEvTotal').innerHTML = formatValue(evTotal, divRatio);
+
+        const mathPphEl = document.getElementById('mathEvPerHour');
+        const mathDivPerHour = (mathEvPerHour / divRatio).toFixed(1);
+        mathPphEl.innerText = `${mathEvPerHour > 0 ? '+' : ''}${Math.round(mathEvPerHour).toLocaleString()} c/hr (~${mathEvPerHour > 0 ? '+' : ''}${mathDivPerHour} Div/hr)`;
+        mathPphEl.className = mathEvPerHour >= 0 ? 'profit' : 'loss';
+
+        // --- CURRENT RUN & SIMULATION MATH ---
+        const finalProfitEl = document.getElementById('simFinalProfit');
+        finalProfitEl.innerHTML = formatValue(currentSingleProfit, divRatio);
+
+        // Total Session Time
+        const totalSeconds = currentAttempts * secPerRun;
+        const totalHours = totalSeconds / 3600;
+        const hours = Math.floor(totalHours);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const timeString = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+        document.getElementById('mcTotalTime').innerText = timeString;
+
+        // Profit Per Hour Calc Helper Function
+        const formatRowData = (value) => {
+            const divTotal = (value / divRatio).toFixed(1);
+            let divPerHour = 0;
+            if (totalHours > 0) {
+                divPerHour = (value / divRatio / totalHours).toFixed(1);
+            }
+            const sign = value > 0 ? '+' : '';
+            return `
+                <span class="${value >= 0 ? 'profit' : 'loss'}">${sign}${Math.round(value).toLocaleString()} c (~${sign}${divTotal} Div)</span>
+                <span class="per-hour">${sign}${divPerHour} Div/hr</span>
+            `;
+        };
+
+        // Monte Carlo PPH
+        const evProfitPerSingleRunMC = currentAvgProfit / currentAttempts;
+        const profitPerHourMC = evProfitPerSingleRunMC * runsPerHour;
+        const divPerHourMC = (profitPerHourMC / divRatio).toFixed(1);
+
+        const pphEl = document.getElementById('mcProfitPerHour');
+        pphEl.innerText = `${profitPerHourMC > 0 ? '+' : ''}${Math.round(profitPerHourMC).toLocaleString()} c/hr (~${profitPerHourMC > 0 ? '+' : ''}${divPerHourMC} Div/hr)`;
+        pphEl.className = profitPerHourMC >= 0 ? 'profit' : 'loss';
+
+        // Update Average and Percentiles Text
+        if (currentPercentiles.p99 !== undefined) {
+            document.getElementById('mcAverage').innerHTML = formatRowData(currentAvgProfit);
+            document.getElementById('mcP99').innerHTML = formatRowData(currentPercentiles.p99);
+            document.getElementById('mcP80').innerHTML = formatRowData(currentPercentiles.p80);
+            document.getElementById('mcP60').innerHTML = formatRowData(currentPercentiles.p60);
+            document.getElementById('mcP40').innerHTML = formatRowData(currentPercentiles.p40);
+            document.getElementById('mcP20').innerHTML = formatRowData(currentPercentiles.p20);
+            document.getElementById('mcP01').innerHTML = formatRowData(currentPercentiles.p01);
+        }
+    }
+
+    function drawChart(profits, divRatio) {
+        const binCount = 40;
+        const min = profits[0];
+        const max = profits[profits.length - 1];
+        const binSize = (max - min) / binCount;
+
+        let bins = new Array(binCount).fill(0);
+        let labels = [];
+
+        for(let i = 0; i < binCount; i++) {
+            labels.push(Math.round((min + i * binSize) / divRatio) + ' Div');
+        }
+
+        profits.forEach(p => {
+            let index = Math.floor((p - min) / binSize);
+            if(index >= binCount) index = binCount - 1;
+            bins[index]++;
+        });
+
+        if(profitChart != null) {
+            profitChart.destroy();
+        }
+
+        const ctx = document.getElementById('profitChart').getContext('2d');
+
+        const backgroundColors = labels.map(label => {
+            return parseFloat(label) >= 0 ? 'rgba(76, 175, 80, 0.7)' : 'rgba(244, 67, 54, 0.7)';
+        });
+
+        profitChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Outcomes',
+                    data: bins,
+                    backgroundColor: backgroundColors,
+                    borderColor: '#1a1a1a',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            title: function(context) { return 'Profit: ' + context[0].label; },
+                            label: function(context) { return context.raw + ' simulations landed here'; }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: '#aaa', maxTicksLimit: 12 },
+                        grid: { color: '#333' },
+                        title: { display: true, text: 'Profit / Loss (in Divines)', color: '#999' }
+                    },
+                    y: {
+                        ticks: { color: '#aaa' },
+                        grid: { color: '#333' },
+                        title: { display: true, text: 'Frequency', color: '#999' }
+                    }
+                }
+            }
+        });
+    }
+</script>
+
+</body>
+</html>
